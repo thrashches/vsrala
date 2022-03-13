@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}
+    Лента активности
+{% endblock title %}
+
+{% block content %}
+    {% for activity in page_obj %}
+        <div>
+            <h5>{{ activity.title }}</h5>
+            <p>{{ activity.description|truncatewords:20 }}</p>
+            <div>
+                <b>{{ activity.distance }}</b><b>{{ activity.duration }}</b>
+            </div>
+
+        {% for media in activity.medias.all %}
+            {% if forloop.first %}
+            <img style="max-width: 500px;" src="{{ media.image.url }}">
+            {% endif %}
+            {% endfor %}
+        </div>
+    {% endfor %}
+{% endblock content %}
