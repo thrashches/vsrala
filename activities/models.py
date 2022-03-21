@@ -1,4 +1,10 @@
+import folium
+import gpxpy
+import io
+
+from PIL import Image
 from django.db import models
+
 from django.contrib.auth import get_user_model
 from datetime import timedelta, time
 
@@ -30,7 +36,15 @@ class Activity(models.Model):
                                       blank=True, null=True,
                                       on_delete=models.SET_NULL, verbose_name='тип тренировки')
     duration = models.DurationField(default=timedelta(minutes=0, seconds=0), verbose_name='продолжительность')
+    duration_active = models.DurationField(default=timedelta(minutes=0, seconds=0),
+                                           blank=True, null=True,
+                                           verbose_name='время в движении')
     distance = models.DecimalField(default=0.00, max_digits=10, decimal_places=2, verbose_name='дистанция')
+    avg_speed = models.DecimalField(default=0.00,
+                                    blank=True, null=True, max_digits=10, decimal_places=2,
+                                    verbose_name='средняя скорость')
+    max_speed = models.DecimalField(default=0.00, blank=True, null=True, decimal_places=2, max_digits=10,
+                                    verbose_name='максимальная скорость')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='дата загрузки')
     started_at = models.DateTimeField(verbose_name='время начала тренировки')
     track_file = models.FileField(blank=True, null=True, upload_to='activities', verbose_name='файл тренировки')
@@ -41,6 +55,7 @@ class Activity(models.Model):
     def save(
             self, force_insert=False, force_update=False, using=None, update_fields=None
     ):
+        create = not self.pk
         if self.title == '' or self.title is None:
             if time(hour=5) <= self.started_at.time() <= time(hour=12):
                 self.title = 'Утренняя тренировка'
@@ -53,3 +68,30 @@ class Activity(models.Model):
                 self.title = 'Ночная тренировка'
         super(Activity, self).save(force_insert=force_insert, force_update=force_update, using=using,
                                    update_fields=update_fields)
+
+        if create and self.track_file:
+            print(self.track_file.path)
+            gpx_file = open(self.track_file.path, 'r')
+            gpx = gpxpy.parse(gpx_file)
+
+            # TODO: Этот кусок рисует точки на карте, а потом рендерит в картинку. Его потом сделаем как микросервис
+            # points = []
+            # for track in gpx.tracks:
+            #     for segment in track.segments:
+            #         for point in segment.points:
+            #             points.append(tuple([point.latitude, point.longitude]))
+            # latitude = sum(p[0] for p in points) / len(points)
+            # longitude = sum(p[1] for p in points) / len(points)
+            # folium_map = folium.Map(location=[latitude, longitude], zoom_start=10)
+            # folium.PolyLine(points, color="red", weight=2.5, opacity=1).add_to(folium_map)
+            # img = folium_map._to_png(5)
+            # output = Image.open(io.BytesIO(img))
+            moving_data = gpx.get_moving_data()
+            self.max_speed = moving_data.max_speed
+            self.avg_speed = (moving_data.moving_distance / 1000) / (moving_data.moving_time / 3600)
+            self.distance = moving_data.moving_distance / 1000
+            self.duration = timedelta(seconds=(moving_data.moving_time + moving_data.stopped_time))
+            self.duration_active = timedelta(seconds=moving_data.moving_time)
+            super(Activity, self).save(force_insert=force_insert, force_update=force_update, using=using,
+                                       update_fields=update_fields)
+            # output.save('media/pictures/test.png')

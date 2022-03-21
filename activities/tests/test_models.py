@@ -19,8 +19,12 @@ class ActivityModelTest(TestCase):
         ]
         cls.activity_types = ActivityType.objects.bulk_create(activity_types)
 
+    def test_activity_types_init(self):
+        activity_types = ActivityType.objects.all()
+        assert activity_types.count() == 6, 'Типы тренировок не созданы!'
+
     def test_create_activity_model(self):
-        activity_type = self.activity_types[0]
+        activity_type = ActivityType.objects.first()
         Activity.objects.create(
             profile=self.profile,
             duration=timedelta(hours=2),

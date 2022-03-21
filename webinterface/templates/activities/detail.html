@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}{{ activity.title }}{% endblock title %}
+{% block content %}
+    <div class="container col-lg-6">
+
+        <div class="card m-3">
+
+            <h4 class="m-1">{{ activity.title }}</h4>
+
+        </div>
+        <div class="card m-3">
+            {{ map|safe }}
+        </div>
+        <div class="card m-3">
+            <div class="card-body">
+                <p>
+                    Дистанция: <b>{{ activity.distance }} км</b>
+                </p>
+                <p>
+                    Общее время: <b>{{ activity.duration }}</b>
+                </p>
+                <p>
+                    Время в движении: <b>{{ activity.duration_active }}</b>
+                </p>
+                <p>
+                    Средняя скорость: <b>{{ activity.avg_speed }}</b>
+                </p>
+                <p>
+                    Максимальная скорость: <b>{{ activity.max_speed }}</b>
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+{% endblock content %}

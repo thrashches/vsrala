@@ -4,19 +4,35 @@
 {% endblock title %}
 
 {% block content %}
-    {% for activity in page_obj %}
-        <div>
-            <h5>{{ activity.title }}</h5>
-            <p>{{ activity.description|truncatewords:20 }}</p>
-            <div>
-                <b>{{ activity.distance }}</b><b>{{ activity.duration }}</b>
-            </div>
+    <div class="container col-lg-6">
+        {% for activity in page_obj %}
+            <div class="card m-3">
+                <div class="card-header">
+                    <h5><a href="{% url 'webinterface:activity_detail' activity.pk %}">{{ activity.title }}</a> <i class="fa-solid fa-person-biking"></i> </h5>
+                    <p>{{ activity.description|truncatewords:20 }}</p>
+                    <div>
+                        <p>
+                            Дистанция: <b>{{ activity.distance }} км</b> Время: <b>{{ activity.duration }}</b>
+                        </p>
+                    </div>
+                </div>
+                <div class="card-body">
 
-        {% for media in activity.medias.all %}
-            {% if forloop.first %}
-            <img style="max-width: 500px;" src="{{ media.image.url }}">
-            {% endif %}
-            {% endfor %}
-        </div>
-    {% endfor %}
+
+
+                    {% for media in activity.medias.all %}
+                        {% if forloop.first %}
+                            <img class="card-img" src="{{ media.image.url }}">
+                        {% endif %}
+                    {% endfor %}
+
+                </div>
+                <div class="card-footer">
+                    <i class="fa-solid fa-thumbs-up"></i>
+                    <a href="#">Комментарии</a>
+
+                </div>
+            </div>
+        {% endfor %}
+    </div>
 {% endblock content %}
