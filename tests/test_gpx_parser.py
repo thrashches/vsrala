@@ -1,8 +1,9 @@
 from pathlib import Path
 from math import isclose
 
-from parsers.gpx import GPXActivity
 from parsers.gpx import calculate_distane2d
+from parsers.gpx import GPXActivity
+from parsers.gpx import isostring2datetime
 
 
 GPX_EXAMPLE_FILE = Path('tests') / 'example.gpx'
@@ -31,12 +32,12 @@ def test_gpx_activity_gives_activity_name() -> None:
 
 def test_gpx_activity_gives_activity_start_time() -> None:
     activity = create_gpx_activity()
-    assert activity.start_time == '2020-06-24T05:36:31Z'
+    assert activity.start_time == isostring2datetime('2020-06-24T05:36:31Z')
 
 
 def test_gpx_activity_gives_activity_finish_time() -> None:
     activity = create_gpx_activity()
-    assert activity.finish_time == '2020-06-24T10:18:16Z'
+    assert activity.finish_time == isostring2datetime('2020-06-24T10:18:16Z')
 
 
 def test_gpx_activity_gives_activity_elevation() -> None:

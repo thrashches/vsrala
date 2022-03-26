@@ -37,7 +37,7 @@ class Tick:
     lat: float
     lon: float
     elevation: float
-    time: str
+    time: datetime
     power: Optional[int] = None
     temperature: Optional[int] = None
     heart_rate: Optional[int] = None
@@ -50,7 +50,7 @@ class Tick:
         return calculate_distane2d(self.lat, self.lon, other.lat, other.lon)
 
 
-def str2dt(isostring: str) -> datetime:
+def isostring2datetime(isostring: str) -> datetime:
     return datetime.strptime(isostring, '%Y-%m-%dT%H:%M:%SZ')
 
 
@@ -71,12 +71,12 @@ class GPXActivity:
         return cls(root=fromstring(xml_raw))
 
     @property
-    def start_time(self) -> str:
+    def start_time(self) -> datetime:
         xpath = './xmlns:metadata/xmlns:time'
-        return self.root.find(xpath, self.namespaces).text
+        return isostring2datetime(self.root.find(xpath, self.namespaces).text)
 
     @property
-    def finish_time(self) -> str:
+    def finish_time(self) -> datetime:
         return self.ticks()[-1].time
 
     @property
@@ -90,7 +90,9 @@ class GPXActivity:
             lat = float(trkpt.attrib['lat'])
             lon = float(trkpt.attrib['lon'])
             ele = float(trkpt.find('xmlns:ele', self.namespaces).text)
-            time = trkpt.find('xmlns:time', self.namespaces).text
+            time = isostring2datetime(
+                trkpt.find('xmlns:time', self.namespaces).text,
+            )
             # optonal
             try:
                 power = int(trkpt.find(
