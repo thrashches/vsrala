@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime
-from math import sqrt
+from math import atan2
+from math import cos
 from math import radians
 from math import sin
-from math import cos
-from math import atan2
-from typing import Optional
+from math import sqrt
+from statistics import mean
+from statistics import median
 from typing import Any
+from typing import Optional
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import fromstring
 
@@ -139,23 +141,65 @@ class GPXActivity:
         return [tick.heart_rate for tick in self.ticks()]
 
     @property
+    def heart_rate_max(self) -> int:
+        return max([hr for hr in self.heart_rate if hr])
+
+    @property
+    def heart_rate_avg(self) -> int:
+        return mean([hr for hr in self.heart_rate if hr])
+
+    @property
     def power(self) -> list[Optional[int]]:
         return [tick.power for tick in self.ticks()]
+
+    @property
+    def power_max(self) -> int:
+        return max([power for power in self.power if power])
+
+    @property
+    def power_avg(self) -> int:
+        # do not include zeros
+        return mean([power for power in self.power if power])
+
+    @property
+    def power_median(self) -> int:
+        # do not include zeros
+        return median([power for power in self.power if power])
 
     @property
     def cadence(self) -> list[Optional[int]]:
         return [tick.cadence for tick in self.ticks()]
 
     @property
+    def cadence_max(self) -> int:
+        return max([cadence for cadence in self.cadence if cadence])
+
+    @property
+    def cadence_avg(self) -> int:
+        return mean([cadence for cadence in self.cadence if cadence])
+
+    @property
+    def cadence_median(self) -> int:
+        return median([cadence for cadence in self.cadence if cadence])
+
+    @property
     def temperature(self) -> list[Optional[int]]:
         return [tick.temperature for tick in self.ticks()]
+
+    @property
+    def temperature_avg(self) -> int:
+        return mean([temp for temp in self.temperature if temp])
 
     @property
     def coordinates2d(self) -> list[tuple[float, float]]:
         return [(tick.lat, tick.lon) for tick in self.ticks()]
 
     @property
-    def distance(self) -> float:
+    def coordinates3d(self) -> list[tuple[float, float, float]]:
+        return [(tick.lat, tick.lon, tick.elevation) for tick in self.ticks()]
+
+    @property
+    def distance(self) -> int:
         """Activity total distance in meters"""
         meters = 0.0
         ticks = self.ticks()
