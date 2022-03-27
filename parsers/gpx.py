@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import timedelta
 from math import atan2
 from math import cos
 from math import radians
@@ -22,7 +23,7 @@ def calculate_distane2d(
         lat2: float,
         lon2: float,
 ) -> float:
-    """Calculate distance  between two points on earth in meters.
+    """Calculate a distance between two points on earth in meters.
 
     https://www.movable-type.co.uk/scripts/latlong.html
     """
@@ -32,6 +33,11 @@ def calculate_distane2d(
         cos(radians(lat2)) * (sin(radians(lon2 - lon1) / 2) ** 2)
     )
     return r * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+def isostring2datetime(isostring: str) -> datetime:
+    """Convert ISO8601 date string to datetime"""
+    return datetime.strptime(isostring, '%Y-%m-%dT%H:%M:%SZ')
 
 
 @dataclass
@@ -46,14 +52,18 @@ class Tick:
     cadence: Optional[int] = None
 
     def distance_to(self, other: Any) -> float:
-        '''distance betweeen two Ticks in meters'''
+        """distance betweeen two Ticks in meters"""
         if not isinstance(other, self.__class__):
             raise TypeError(f'Can not compare {other.__class__} and Tick')
         return calculate_distane2d(self.lat, self.lon, other.lat, other.lon)
 
-
-def isostring2datetime(isostring: str) -> datetime:
-    return datetime.strptime(isostring, '%Y-%m-%dT%H:%M:%SZ')
+    def timedelta(self, other: Any) -> timedelta:
+        if not isinstance(other, self.__class__):
+            raise TypeError(f'Can not compare {other.__class__} and Tick')
+        # ensure timedelta is positive
+        if other.time > self.time:
+            return other.time - self.time
+        return self.time - other.time
 
 
 class GPXActivity:
@@ -80,6 +90,10 @@ class GPXActivity:
     @property
     def finish_time(self) -> datetime:
         return self.ticks()[-1].time
+
+    @property
+    def duration(self) -> timedelta:
+        return self.finish_time - self.start_time
 
     @property
     def name(self) -> str:

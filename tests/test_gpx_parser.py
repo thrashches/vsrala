@@ -1,5 +1,9 @@
-from pathlib import Path
+from datetime import datetime
+from datetime import timedelta
 from math import isclose
+from pathlib import Path
+
+import pytest
 
 from parsers.gpx import calculate_distane2d
 from parsers.gpx import GPXActivity
@@ -94,3 +98,26 @@ def test_calculate_distance_gives_correct_distance() -> None:
 def test_gpx_activity_gives_activity_distance() -> None:
     activity = create_gpx_activity()
     assert isclose(activity.distance, 101.51 * 1000, rel_tol=0.01)
+
+
+def test_gpx_activity_gives_activity_duration() -> None:
+    activity = create_gpx_activity()
+    duration = activity.duration
+    assert duration == timedelta(seconds=16905)
+
+
+@pytest.mark.parametrize('isostring,dt', [
+    (
+        '2020-06-24T05:36:31Z',
+        datetime(2020, 6, 24, 5, 36, 31),
+    ),
+    (
+        '2021-11-04T22:18:16Z',
+        datetime(2021, 11, 4, 22, 18, 16),
+    ),
+])
+def test_isostring2datetime_covert_isostring_correctly(
+        isostring: str,
+        dt: datetime,
+) -> None:
+    assert isostring2datetime(isostring) == dt
