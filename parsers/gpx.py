@@ -288,3 +288,15 @@ class GPXActivity:
     @property
     def speed_max(self) -> float:
         return max(self.speed)
+
+    @property
+    def duration_active(self) -> timedelta:
+        inactive_threshold = 3  # seconds
+        td = timedelta(seconds=0)
+        ticks = self.ticks()
+        for previous, current in zip(ticks, ticks[1:]):
+            tick_duration = previous.timedelta(current)
+            if tick_duration.total_seconds() > inactive_threshold:
+                continue
+            td += tick_duration
+        return td

@@ -110,6 +110,9 @@ def test_gpx_activity_gives_activity_duration() -> None:
     activity = create_gpx_activity()
     duration = activity.duration
     assert duration == timedelta(seconds=16905)
+    duration_active = activity.duration_active
+    assert duration_active < duration
+    assert isclose(duration_active.total_seconds(), 14000, rel_tol=0.05)
 
 
 @pytest.mark.parametrize('isostring,dt', [
