@@ -3,16 +3,19 @@ from datetime import datetime
 from datetime import timedelta
 from math import atan2
 from math import cos
+from math import isclose
 from math import radians
 from math import sin
 from math import sqrt
-from math import isclose
+from pathlib import Path
 from statistics import mean
 from statistics import median
 from typing import Any
 from typing import Optional
+from typing import Union
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import parse
 
 from numba import jit  # type: ignore
 
@@ -66,6 +69,7 @@ def normalize(
         ):
             floats[i] = neighbors_median
 
+
 @dataclass
 class Tick:
     lat: float
@@ -117,8 +121,12 @@ class GPXActivity:
         self._ticks: list[Tick] = []
 
     @classmethod
-    def fromstring(cls, xml_raw) -> 'GPXActivity':
+    def fromstring(cls, xml_raw: Union[str, bytes]) -> 'GPXActivity':
         return cls(root=fromstring(xml_raw))
+
+    @classmethod
+    def fromfile(cls, xml_file_path: Union[str, Path]) -> 'GPXActivity':
+        return cls(root=parse(xml_file_path))
 
     @property
     def start_time(self) -> datetime:

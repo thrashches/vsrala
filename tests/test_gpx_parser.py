@@ -26,8 +26,13 @@ def create_gpx_activity() -> GPXActivity:
     return _gpx_activity
 
 
-def test_gpx_activity_created() -> None:
-    create_gpx_activity()
+def test_gpx_activity_created_from_string() -> None:
+    GPXActivity.fromstring(GPX_EXAMPLE_FILE.read_text())
+    GPXActivity.fromstring(GPX_EXAMPLE_FILE.read_bytes())
+
+
+def test_gpx_activity_created_from_file() -> None:
+    GPXActivity.fromfile(GPX_EXAMPLE_FILE)
 
 
 def test_gpx_activity_gives_activity_name() -> None:
