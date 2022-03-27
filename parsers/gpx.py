@@ -6,6 +6,7 @@ from math import cos
 from math import radians
 from math import sin
 from math import sqrt
+from math import isclose
 from statistics import mean
 from statistics import median
 from typing import Any
@@ -40,6 +41,31 @@ def isostring2datetime(isostring: str) -> datetime:
     return datetime.strptime(isostring, '%Y-%m-%dT%H:%M:%SZ')
 
 
+def convert_mps2kmph(mps: float) -> float:
+    """Convert speed from meter per second to km per hour"""
+    return mps * 18 / 5
+
+
+def normalize(
+        floats: list[float],
+        k: int = 2,
+        rel_tol=0.3,
+) -> list[float]:
+    """Check that each value is close to K closes neighbors by rel_tol"""
+    size = len(floats) - 1
+    for i, current_value in enumerate(floats):
+        left = max((i - k, 0))
+        right = min((i + k + 1, size))
+        neighbors_median = median(
+            floats[left:i] + floats[min((i, size - 1)):right],
+        )
+        if current_value != 0.0 and not isclose(
+            current_value,
+            neighbors_median,
+            rel_tol=rel_tol,
+        ):
+            floats[i] = neighbors_median
+
 @dataclass
 class Tick:
     lat: float
@@ -51,19 +77,31 @@ class Tick:
     heart_rate: Optional[int] = None
     cadence: Optional[int] = None
 
-    def distance_to(self, other: Any) -> float:
-        """distance betweeen two Ticks in meters"""
+    def _ensure_other_is_tick(self, other: Any) -> None:
         if not isinstance(other, self.__class__):
             raise TypeError(f'Can not compare {other.__class__} and Tick')
+
+    def distance_to(self, other: Any) -> float:
+        """Distance betweeen two Ticks in meters"""
+        self._ensure_other_is_tick(other)
         return calculate_distane2d(self.lat, self.lon, other.lat, other.lon)
 
     def timedelta(self, other: Any) -> timedelta:
-        if not isinstance(other, self.__class__):
-            raise TypeError(f'Can not compare {other.__class__} and Tick')
+        self._ensure_other_is_tick(other)
         # ensure timedelta is positive
         if other.time > self.time:
             return other.time - self.time
         return self.time - other.time
+
+    def speed_mps(self, other: Any) -> float:
+        """Speed between tow Ticks in km/h"""
+        self._ensure_other_is_tick(other)
+        meters: float = self.distance_to(other)
+        seconds: float = self.timedelta(other).total_seconds()
+        return meters / seconds
+
+    def speed_kmph(self, other: Any) -> float:
+        return convert_mps2kmph(self.speed_mps(other))
 
 
 class GPXActivity:
@@ -220,3 +258,25 @@ class GPXActivity:
         for previous, current in zip(ticks, ticks[1:]):
             meters += current.distance_to(previous)
         return meters
+
+    @property
+    def speed(self) -> list[float]:
+        """Activity speed for each tick in kmph"""
+        speeds: list[float] = []
+        ticks = self.ticks()
+        for previous, current in zip(ticks, ticks[1:]):
+            speeds.append(current.speed_kmph(previous))
+        normalize(speeds, k=5, rel_tol=0.1)
+        return speeds
+
+    @property
+    def speed_avg(self) -> float:
+        return mean(self.speed)
+
+    @property
+    def speed_median(self) -> float:
+        return median(self.speed)
+
+    @property
+    def speed_max(self) -> float:
+        return max(self.speed)

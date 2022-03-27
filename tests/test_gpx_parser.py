@@ -8,6 +8,7 @@ import pytest
 from parsers.gpx import calculate_distane2d
 from parsers.gpx import GPXActivity
 from parsers.gpx import isostring2datetime
+from parsers.gpx import normalize
 
 
 GPX_EXAMPLE_FILE = Path('tests') / 'example.gpx'
@@ -121,3 +122,31 @@ def test_isostring2datetime_covert_isostring_correctly(
         dt: datetime,
 ) -> None:
     assert isostring2datetime(isostring) == dt
+
+
+@pytest.mark.parametrize('data_raw,data_expected', [
+    (
+        [1.0, 1.0, 1.0, 9.9, 1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    ),
+    (
+        [1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0],
+    ),
+])
+def test_normalize_filters_out_peaks(
+        data_raw: list[float],
+        data_expected: list[float],
+) -> None:
+    normalize(data_raw)
+    assert data_raw == data_expected
+
+
+def test_gpx_activity_gives_activity_speed() -> None:
+    activity = create_gpx_activity()
+    speed = activity.speed
+    assert 40.645336752961654 in speed
+    assert 27.532664652318726 in speed
+    assert isclose(activity.speed_avg, 26, abs_tol=0.5)
+    assert isclose(activity.speed_median, 27, abs_tol=0.5)
+    assert isclose(activity.speed_max, 55, abs_tol=0.5)
