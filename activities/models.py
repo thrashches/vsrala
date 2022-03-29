@@ -26,6 +26,7 @@ class Activity(models.Model):
     class Meta:
         verbose_name = 'тренировка'
         verbose_name_plural = 'тренировки'
+        ordering = ['-created_at', ]
 
     title = models.CharField(max_length=255, default='',
                              blank=True, null=True,

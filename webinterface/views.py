@@ -24,6 +24,17 @@ class FeedView(LoginRequiredMixin, ListView):
         return queryset.filter(profile__in=follows)
 
 
+class MyActivitiesView(LoginRequiredMixin, ListView):
+    model = Activity
+    template_name = 'feed/index.html'
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = super(MyActivitiesView, self).get_queryset()
+        user = self.request.user
+        return queryset.filter(profile=user)
+
+
 class ActivityDetailView(LoginRequiredMixin, DetailView):
     model = Activity
     template_name = 'activities/detail.html'

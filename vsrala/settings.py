@@ -107,6 +107,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = 'profiles.Profile'
 
+LOGIN_URL = 'webinterface:login'
+
+LOGOUT_REDIRECT_URL = 'webinterface:login'
+
+LOGIN_REDIRECT_URL = 'webinterface:feed'
+
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
 
@@ -123,6 +129,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATIC_ROOT = 'static'
 
 MEDIA_URL = 'media/'
 

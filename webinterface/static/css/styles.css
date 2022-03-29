@@ -1,0 +1,11 @@
+body {
+    min-height: 100%;
+
+}
+
+.login-card {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    vertical-align: center;
+}
