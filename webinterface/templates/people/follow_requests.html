@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Запросы на подписку{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 py-6">
+    <div class="mb-5">
+        <h1 class="text-xl font-bold text-ink">Запросы на подписку</h1>
+    </div>
+
+    {% if follow_requests %}
+        <div class="space-y-3">
+            {% for req in follow_requests %}
+                <article class="flex items-center gap-3 rounded bg-white px-4 py-3 shadow-card">
+                    {% include 'includes/person_avatar.html' with person=req.from_user %}
+                    <div class="min-w-0 flex-1">
+                        <a href="{% url 'webinterface:profile_detail' req.from_user.pk %}"
+                           class="block truncate text-sm font-semibold text-ink hover:text-brand">
+                            {{ req.from_user.display_name }}
+                        </a>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <form method="post"
+                              action="{% url 'webinterface:follow_request_action' req.pk 'accept' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-brand text-xs sm:text-sm">Принять</button>
+                        </form>
+                        <form method="post"
+                              action="{% url 'webinterface:follow_request_action' req.pk 'reject' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-ghost text-xs sm:text-sm">Отклонить</button>
+                        </form>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+            <div class="mt-6 flex justify-center gap-2">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="btn-ghost">Назад</a>
+                {% endif %}
+                <span class="px-3 py-2 text-sm text-ink-muted">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="btn-ghost">Вперёд</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="rounded bg-white px-6 py-10 text-center shadow-card">
+            <p class="text-sm text-ink-muted">Нет новых запросов.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}

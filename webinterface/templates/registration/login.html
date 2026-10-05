@@ -1,21 +1,35 @@
 {% extends 'base.html' %}
-
-{% block title %}
-    Вход
-{% endblock title %}
+{% block title %}Вход{% endblock title %}
 
 {% block content %}
-    <div class="container col-lg-2">
-    <div class="login-card">
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button class="btn btn-secondary" type="submit">Вход</button>
-                </form>
-            </div>
-        </div>
+<div class="mx-auto flex min-h-[70vh] max-w-sm items-center px-4">
+    <div class="w-full rounded bg-white p-6 shadow-card">
+        <h1 class="text-center text-xl font-bold text-ink">Вход в VSRALA</h1>
+        <form method="post" class="mt-6 space-y-4">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+            {% for field in form %}
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                    </label>
+                    <input type="{{ field.field.widget.input_type }}"
+                           name="{{ field.name }}"
+                           id="{{ field.id_for_label }}"
+                           {% if field.value %}value="{{ field.value }}"{% endif %}
+                           class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                           {% if field.field.required %}required{% endif %}>
+                    {% if field.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ field.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <button class="btn-brand w-full" type="submit">Войти</button>
+        </form>
     </div>
-    </div>
+</div>
 {% endblock content %}

@@ -1,0 +1,101 @@
+<section id="comments"
+         class="activity-comments border-t border-gray-100 px-5 py-5"
+         data-create-url="{% url 'webinterface:activity_comment_create' activity.pk %}"
+         data-action-url-template="{% url 'webinterface:activity_comment_action' activity.pk 0 %}"
+         data-max-length="{{ comment_text_max_length }}"
+         data-profile-url-template="{% url 'webinterface:profile_detail' 0 %}">
+    <h2 class="text-sm font-semibold text-ink">Комментарии</h2>
+
+    <div class="mt-4 space-y-4" data-comments-list>
+        {% for comment in comments %}
+            <article class="activity-comment"
+                     data-comment-id="{{ comment.pk }}"
+                     data-can-edit="{% if comment.can_edit %}1{% else %}0{% endif %}"
+                     data-can-delete="{% if comment.can_delete %}1{% else %}0{% endif %}">
+                <div class="flex items-start gap-3">
+                    {% include 'includes/person_avatar.html' with person=comment.profile avatar_class='h-8 w-8 text-xs' %}
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <a href="{% url 'webinterface:profile_detail' comment.profile.pk %}"
+                               class="text-sm font-semibold hover:text-brand"
+                               data-comment-author>
+                                {{ comment.profile.display_name }}
+                            </a>
+                            <time class="text-xs text-ink-muted" datetime="{{ comment.created_at|date:'c' }}" data-comment-time>
+                                {{ comment.created_at|date:"d M Y, H:i" }}
+                                {% if comment.updated_at != comment.created_at %} · изменён{% endif %}
+                            </time>
+                        </div>
+                        <p class="mt-1 whitespace-pre-wrap text-sm text-ink" data-comment-text>{{ comment.text }}</p>
+                        <div class="mt-2 hidden" data-comment-edit-form>
+                            <textarea class="activity-comment__textarea w-full"
+                                      rows="3"
+                                      maxlength="{{ comment_text_max_length }}"
+                                      data-comment-edit-input></textarea>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <button type="button" class="btn-brand" data-comment-save>Сохранить</button>
+                                <button type="button" class="btn-ghost" data-comment-cancel>Отмена</button>
+                            </div>
+                        </div>
+                        {% if comment.can_edit or comment.can_delete %}
+                            <div class="mt-2 flex flex-wrap gap-3 text-xs" data-comment-actions>
+                                {% if comment.can_edit %}
+                                    <button type="button" class="font-medium text-ink-muted hover:text-brand" data-comment-edit>Изменить</button>
+                                {% endif %}
+                                {% if comment.can_delete %}
+                                    <button type="button" class="font-medium text-ink-muted hover:text-red-600" data-comment-delete>Удалить</button>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+        {% empty %}
+            <p class="text-sm text-ink-muted" data-comments-empty>Пока нет комментариев.</p>
+        {% endfor %}
+    </div>
+
+    <form class="mt-5" data-comment-form>
+        <label for="comment-text" class="sr-only">Новый комментарий</label>
+        <textarea id="comment-text"
+                  name="text"
+                  rows="3"
+                  maxlength="{{ comment_text_max_length }}"
+                  placeholder="Написать комментарий…"
+                  class="activity-comment__textarea w-full"
+                  data-comment-input
+                  required></textarea>
+        <div class="mt-2 flex items-center justify-between gap-3">
+            <p class="text-xs text-red-600 hidden" data-comment-error></p>
+            <button type="submit" class="btn-brand ml-auto">Отправить</button>
+        </div>
+    </form>
+</section>
+
+<template id="activity-comment-template">
+    <article class="activity-comment" data-comment-id="">
+        <div class="flex items-start gap-3">
+            <a href="#" class="avatar h-8 w-8 text-xs" data-comment-avatar>
+                <span data-comment-avatar-initial></span>
+            </a>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <a href="#" class="text-sm font-semibold hover:text-brand" data-comment-author></a>
+                    <time class="text-xs text-ink-muted" data-comment-time></time>
+                </div>
+                <p class="mt-1 whitespace-pre-wrap text-sm text-ink" data-comment-text></p>
+                <div class="mt-2 hidden" data-comment-edit-form>
+                    <textarea class="activity-comment__textarea w-full" rows="3" data-comment-edit-input></textarea>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <button type="button" class="btn-brand" data-comment-save>Сохранить</button>
+                        <button type="button" class="btn-ghost" data-comment-cancel>Отмена</button>
+                    </div>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-3 text-xs" data-comment-actions>
+                    <button type="button" class="font-medium text-ink-muted hover:text-brand" data-comment-edit hidden>Изменить</button>
+                    <button type="button" class="font-medium text-ink-muted hover:text-red-600" data-comment-delete hidden>Удалить</button>
+                </div>
+            </div>
+        </div>
+    </article>
+</template>

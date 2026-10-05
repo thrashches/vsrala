@@ -1,0 +1,9 @@
+{% load static %}
+<a href="{% url 'webinterface:profile_detail' person.pk %}"
+   class="avatar {{ avatar_class|default:'h-10 w-10 text-sm' }}">
+    {% if person.photo %}
+        <img src="{{ person.photo.url }}" alt="">
+    {% else %}
+        {{ person.email|make_list|first|upper }}
+    {% endif %}
+</a>

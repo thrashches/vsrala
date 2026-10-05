@@ -1,0 +1,11 @@
+{
+  "name": "vsrala",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./webinterface/static/css/input.css -o ./webinterface/static/css/app.css --minify",
+    "watch:css": "tailwindcss -i ./webinterface/static/css/input.css -o ./webinterface/static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

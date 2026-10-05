@@ -1,0 +1,14 @@
+{% load static %}
+<article class="flex items-center gap-3 rounded bg-white px-4 py-3 shadow-card">
+    {% include 'includes/person_avatar.html' with person=person %}
+    <div class="min-w-0 flex-1">
+        <a href="{% url 'webinterface:profile_detail' person.pk %}"
+           class="block truncate text-sm font-semibold text-ink hover:text-brand">
+            {{ person.display_name }}
+        </a>
+        {% if show_email and person.first_name %}
+            <div class="truncate text-xs text-ink-muted">{{ person.email }}</div>
+        {% endif %}
+    </div>
+    {% include 'includes/follow_button.html' with person=person %}
+</article>

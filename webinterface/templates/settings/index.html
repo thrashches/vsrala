@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% block title %}Настройки{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-lg space-y-6 px-4 py-10">
+    <div>
+        <h1 class="text-xl font-bold text-ink">Настройки</h1>
+        <p class="mt-1 text-sm text-ink-muted">Профиль, приватность и безопасность аккаунта.</p>
+    </div>
+
+    {# —— Профиль —— #}
+    <section class="rounded bg-white p-6 shadow-card">
+        <h2 class="text-base font-bold text-ink">Профиль</h2>
+        <form method="post" enctype="multipart/form-data" class="mt-5 space-y-5">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="profile">
+
+            {% if active_action == 'profile' and profile_form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ profile_form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="flex items-center gap-4">
+                <div class="avatar h-20 w-20 text-xl" id="avatar-frame">
+                    {% if user.photo %}
+                        <img src="{{ user.photo.url }}" alt="" id="avatar-preview">
+                    {% else %}
+                        <span id="avatar-fallback">{{ user.email|make_list|first|upper }}</span>
+                        <img src="" alt="" class="hidden" id="avatar-preview">
+                    {% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <label for="id_photo" class="btn-ghost cursor-pointer text-xs sm:text-sm">
+                        Сменить аватар
+                    </label>
+                    {{ profile_form.photo }}
+                    <p class="mt-1 text-xs text-ink-muted">JPEG, PNG, GIF или WebP, до 5 МБ</p>
+                    {% if profile_form.photo.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ profile_form.photo.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.first_name.id_for_label }}">Отображаемое имя</label>
+                {{ profile_form.first_name }}
+                {% if profile_form.first_name.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ profile_form.first_name.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.email.id_for_label }}">Почта</label>
+                {{ profile_form.email }}
+                {% if profile_form.email.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ profile_form.email.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.telegram.id_for_label }}">Telegram</label>
+                {{ profile_form.telegram }}
+                {% if profile_form.telegram.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ profile_form.telegram.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.instagram.id_for_label }}">Instagram</label>
+                {{ profile_form.instagram }}
+                {% if profile_form.instagram.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ profile_form.instagram.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.vk.id_for_label }}">VK</label>
+                {{ profile_form.vk }}
+                {% if profile_form.vk.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ profile_form.vk.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.ftp.id_for_label }}">FTP (Вт)</label>
+                    {{ profile_form.ftp }}
+                    <p class="mt-1 text-xs text-ink-muted">Для TSS и зон мощности</p>
+                    {% if profile_form.ftp.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ profile_form.ftp.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ profile_form.max_heart_rate.id_for_label }}">Макс. пульс</label>
+                    {{ profile_form.max_heart_rate }}
+                    <p class="mt-1 text-xs text-ink-muted">Для зон пульса (Friel / intervals)</p>
+                    {% if profile_form.max_heart_rate.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ profile_form.max_heart_rate.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="rounded border border-gray-200 bg-feed px-4 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-semibold text-ink">Зоны мощности</h3>
+                        <p class="mt-0.5 text-xs text-ink-muted">7 зон Joe Friel от FTP. Можно править вручную.</p>
+                    </div>
+                    <button type="submit" name="recalculate_zones" value="1" class="btn-ghost text-xs">
+                        Пересчитать зоны
+                    </button>
+                </div>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wide text-ink-muted">
+                                <th class="py-1 pr-2 font-semibold">Зона</th>
+                                <th class="py-1 pr-2 font-semibold">От</th>
+                                <th class="py-1 font-semibold">До</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for zone in profile_form.power_zones_for_display %}
+                            <tr class="border-t border-gray-200">
+                                <td class="py-2 pr-2">
+                                    <span class="font-medium text-ink">Z{{ forloop.counter }}</span>
+                                    <span class="text-ink-muted">{{ zone.name }}</span>
+                                    <input type="hidden" name="power_zone_{{ forloop.counter0 }}_name" value="{{ zone.name }}">
+                                </td>
+                                <td class="py-2 pr-2">
+                                    <input type="number" name="power_zone_{{ forloop.counter0 }}_min"
+                                           value="{% if zone.min != None and zone.min != '' %}{{ zone.min }}{% endif %}"
+                                           min="0" class="{{ profile_form.zone_input_class }}"
+                                           {% if not user.ftp and not zone.min and zone.min != 0 %}placeholder="—" {% endif %}>
+                                </td>
+                                <td class="py-2">
+                                    {% if forloop.last %}
+                                        <span class="text-ink-muted">∞</span>
+                                        <input type="hidden" name="power_zone_{{ forloop.counter0 }}_max" value="">
+                                    {% else %}
+                                        <input type="number" name="power_zone_{{ forloop.counter0 }}_max"
+                                               value="{% if zone.max != None and zone.max != '' %}{{ zone.max }}{% endif %}"
+                                               min="0" class="{{ profile_form.zone_input_class }}">
+                                    {% endif %}
+                                    <span class="ml-1 text-xs text-ink-muted">Вт</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="rounded border border-gray-200 bg-feed px-4 py-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-ink">Зоны пульса</h3>
+                    <p class="mt-0.5 text-xs text-ink-muted">7 зон Joe Friel от LTHR (≈ 95% макс. пульса). Можно править вручную.</p>
+                </div>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wide text-ink-muted">
+                                <th class="py-1 pr-2 font-semibold">Зона</th>
+                                <th class="py-1 pr-2 font-semibold">От</th>
+                                <th class="py-1 font-semibold">До</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for zone in profile_form.hr_zones_for_display %}
+                            <tr class="border-t border-gray-200">
+                                <td class="py-2 pr-2">
+                                    <span class="font-medium text-ink">Z{{ forloop.counter }}</span>
+                                    <span class="text-ink-muted">{{ zone.name }}</span>
+                                    <input type="hidden" name="hr_zone_{{ forloop.counter0 }}_name" value="{{ zone.name }}">
+                                </td>
+                                <td class="py-2 pr-2">
+                                    <input type="number" name="hr_zone_{{ forloop.counter0 }}_min"
+                                           value="{% if zone.min != None and zone.min != '' %}{{ zone.min }}{% endif %}"
+                                           min="0" class="{{ profile_form.zone_input_class }}">
+                                </td>
+                                <td class="py-2">
+                                    {% if forloop.last %}
+                                        <span class="text-ink-muted">∞</span>
+                                        <input type="hidden" name="hr_zone_{{ forloop.counter0 }}_max" value="">
+                                    {% else %}
+                                        <input type="number" name="hr_zone_{{ forloop.counter0 }}_max"
+                                               value="{% if zone.max != None and zone.max != '' %}{{ zone.max }}{% endif %}"
+                                               min="0" class="{{ profile_form.zone_input_class }}">
+                                    {% endif %}
+                                    <span class="ml-1 text-xs text-ink-muted">уд/мин</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="rounded border border-gray-200 bg-feed px-4 py-3">
+                <label class="flex cursor-pointer items-start gap-3">
+                    {{ profile_form.is_public }}
+                    <span>
+                        <span class="block text-sm font-semibold text-ink">Открытый профиль</span>
+                        <span class="mt-0.5 block text-xs text-ink-muted">
+                            Открытый — тренировки видят все. Закрытый — только подписчики.
+                        </span>
+                    </span>
+                </label>
+                {% if profile_form.is_public.errors %}
+                    <p class="mt-2 text-sm text-red-600">{{ profile_form.is_public.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn-brand w-full">Сохранить</button>
+        </form>
+    </section>
+
+    {# —— Пароль —— #}
+    <section class="rounded bg-white p-6 shadow-card">
+        <h2 class="text-base font-bold text-ink">Пароль</h2>
+        <form method="post" class="mt-5 space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+
+            {% if active_action == 'password' and password_form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ password_form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            {% for field in password_form %}
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ field.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <button type="submit" class="btn-brand w-full">Сменить пароль</button>
+        </form>
+    </section>
+
+    {# —— Внешние сервисы —— #}
+    <section class="rounded bg-white p-6 shadow-card">
+        <h2 class="text-base font-bold text-ink">Внешние сервисы</h2>
+        <p class="mt-1 text-sm text-ink-muted">Импорт тренировок из внешних платформ.</p>
+        <ul class="mt-5 space-y-3">
+            <li class="rounded border border-gray-200 bg-feed px-4 py-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-ink">Intervals.icu</p>
+                        {% if intervals_connection and intervals_connection.is_active %}
+                            <p class="mt-0.5 text-xs text-green-700">
+                                Подключено{% if intervals_connection.athlete_id %} · атлет {{ intervals_connection.athlete_id }}{% endif %}
+                            </p>
+                            {% if intervals_connection.initial_sync_done %}
+                                <p class="mt-0.5 text-xs text-ink-muted">
+                                    Синхронизация активна
+                                    {% if intervals_connection.last_synced_at %}
+                                        · {{ intervals_connection.last_synced_at|date:"d.m.Y H:i" }}
+                                    {% endif %}
+                                </p>
+                            {% else %}
+                                <p class="mt-0.5 text-xs text-ink-muted">Идёт начальная загрузка за последние 6 месяцев…</p>
+                            {% endif %}
+                        {% elif intervals_connection and intervals_connection.last_error %}
+                            <p class="mt-0.5 text-xs text-red-600">Ошибка: {{ intervals_connection.last_error|truncatechars:120 }}</p>
+                        {% else %}
+                            <p class="mt-0.5 text-xs text-ink-muted">API-ключ из настроек Intervals.icu → Developer Settings</p>
+                        {% endif %}
+                    </div>
+                    {% if intervals_connection and intervals_connection.is_active %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="intervals_disconnect">
+                            <button type="submit"
+                                    class="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-ink hover:bg-gray-50">
+                                Отключить
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+
+                {% if not intervals_connection or not intervals_connection.is_active %}
+                    <form method="post" class="mt-4 space-y-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="intervals_connect">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted"
+                                   for="{{ intervals_form.api_key.id_for_label }}">
+                                {{ intervals_form.api_key.label }}
+                            </label>
+                            {{ intervals_form.api_key }}
+                            {% if active_action == 'intervals_connect' and intervals_form.api_key.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ intervals_form.api_key.errors|striptags }}</p>
+                            {% endif %}
+                            {% if active_action == 'intervals_connect' and intervals_form.non_field_errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ intervals_form.non_field_errors|striptags }}</p>
+                            {% endif %}
+                        </div>
+                        <button type="submit" class="btn-brand w-full sm:w-auto">Подключить</button>
+                    </form>
+                {% endif %}
+            </li>
+            <li class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-4 py-3 opacity-60">
+                <div>
+                    <p class="text-sm font-semibold text-ink">Garmin</p>
+                    <p class="text-xs text-ink-muted">Скоро</p>
+                </div>
+                <button type="button" disabled class="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-400 cursor-not-allowed">
+                    Подключить
+                </button>
+            </li>
+        </ul>
+    </section>
+
+    {# —— Удаление —— #}
+    <section class="rounded border border-red-200 bg-white p-6 shadow-card">
+        <h2 class="text-base font-bold text-red-700">Удаление профиля</h2>
+        <p class="mt-1 text-sm text-ink-muted">
+            Профиль и все тренировки будут удалены безвозвратно.
+        </p>
+        <form method="post" class="mt-5 space-y-4" id="delete-form"
+              onsubmit="return confirm('Удалить профиль навсегда? Это действие нельзя отменить.');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+
+            {% if active_action == 'delete' and delete_form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ delete_form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted" for="{{ delete_form.password.id_for_label }}">
+                    {{ delete_form.password.label }}
+                </label>
+                {{ delete_form.password }}
+                {% if delete_form.password.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ delete_form.password.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            <button type="submit"
+                    class="inline-flex w-full items-center justify-center rounded bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">
+                Удалить профиль
+            </button>
+        </form>
+    </section>
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById('id_photo');
+  var preview = document.getElementById('avatar-preview');
+  var fallback = document.getElementById('avatar-fallback');
+  if (!input || !preview) return;
+
+  input.addEventListener('change', function () {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (preview.dataset.objectUrl) {
+      URL.revokeObjectURL(preview.dataset.objectUrl);
+    }
+    var url = URL.createObjectURL(file);
+    preview.dataset.objectUrl = url;
+    preview.src = url;
+    preview.classList.remove('hidden');
+    if (fallback) fallback.classList.add('hidden');
+  });
+})();
+</script>
+{% endblock content %}

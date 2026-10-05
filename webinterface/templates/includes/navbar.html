@@ -1,34 +1,71 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <a class="navbar-brand" href="#">VSRALA</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+{% load static %}
+<header class="sticky top-0 z-[1100] border-b border-gray-200 bg-white">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2">
+        <div class="flex items-center gap-6">
+            <a href="{% url 'webinterface:feed' %}" class="flex shrink-0 items-center">
+                <img src="{% static 'img/logo.svg' %}" alt="VSRALA" class="h-7 w-auto">
+            </a>
+            {% if user.is_authenticated %}
+                <div class="hidden items-center gap-1 sm:flex">
+                    <a href="{% url 'webinterface:feed' %}"
+                       class="rounded px-3 py-2 text-sm font-semibold text-ink hover:bg-gray-100">Лента</a>
+                    <a href="{% url 'webinterface:people_search' %}"
+                       class="rounded px-3 py-2 text-sm font-semibold text-ink hover:bg-gray-100">Люди</a>
+                    <a href="{% url 'webinterface:my_activities' %}"
+                       class="rounded px-3 py-2 text-sm font-semibold text-ink hover:bg-gray-100">Мои тренировки</a>
+                </div>
+            {% endif %}
+        </div>
         {% if user.is_authenticated %}
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'webinterface:feed' %}">
-                        Лента активности
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'webinterface:my_activities' %}">Мои тренировки
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#">Загрузить тренировку</a>
-                </li>
-
-            </ul>
-
-            <form class="form-inline my-2 my-lg-0">
-                <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
-                <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
-            </form>
-
-            <button class="btn btn-secondary" onclick="window.location.href='{% url 'webinterface:logout' %}'">Выход</button>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'webinterface:follow_requests' %}"
+                   class="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition hover:bg-gray-100"
+                   title="Запросы"
+                   aria-label="Запросы">
+                    <span class="material-icons text-[22px] leading-none" aria-hidden="true">group</span>
+                    {% if pending_follow_requests_count %}
+                        <span class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500"
+                              aria-hidden="true"></span>
+                        <span class="sr-only">{{ pending_follow_requests_count }} новых запросов</span>
+                    {% endif %}
+                </a>
+                <a href="{% url 'webinterface:activity_upload' %}"
+                   class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white transition hover:bg-brand-dark"
+                   title="Загрузить"
+                   aria-label="Загрузить">
+                    <span class="material-icons text-[20px] leading-none" aria-hidden="true">add</span>
+                </a>
+                <div class="relative" data-user-menu>
+                    <button type="button"
+                            class="flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-1.5 transition hover:bg-gray-100"
+                            aria-expanded="false"
+                            aria-haspopup="true"
+                            aria-label="Меню пользователя"
+                            data-user-menu-toggle>
+                        <span class="avatar h-10 w-10 text-sm ring-1 ring-gray-200">
+                            {% if user.photo %}
+                                <img src="{{ user.photo.url }}" alt="">
+                            {% else %}
+                                {{ user.email|make_list|first|upper }}
+                            {% endif %}
+                        </span>
+                        <span class="material-icons text-base leading-none text-ink-muted transition" data-user-menu-chevron aria-hidden="true">expand_more</span>
+                    </button>
+                    <div class="absolute right-0 mt-2 hidden w-44 overflow-hidden rounded border border-gray-200 bg-white py-1 shadow-card"
+                         role="menu"
+                         data-user-menu-panel>
+                        <a href="{% url 'webinterface:profile_detail' user.pk %}"
+                           class="block px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                           role="menuitem">Профиль</a>
+                        <a href="{% url 'webinterface:settings' %}"
+                           class="block px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                           role="menuitem">Настройки</a>
+                        <a href="{% url 'webinterface:logout' %}"
+                           class="block px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                           role="menuitem">Выход</a>
+                    </div>
+                </div>
+            </div>
         {% endif %}
-    </div>
-</nav>
+    </nav>
+</header>

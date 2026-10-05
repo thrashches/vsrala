@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ profile.display_name }}{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 py-6">
+    <section class="rounded bg-white p-6 shadow-card">
+        <div class="flex items-start gap-4">
+            {% include 'includes/person_avatar.html' with person=profile avatar_class='h-16 w-16 text-xl' %}
+            <div class="min-w-0 flex-1">
+                <h1 class="truncate text-xl font-bold text-ink">{{ profile.display_name }}</h1>
+                {% if not is_own_profile %}
+                    <div class="mt-3">
+                        {% include 'includes/follow_button.html' with person=profile %}
+                    </div>
+                {% else %}
+                    <a href="{% url 'webinterface:settings' %}" class="btn-ghost mt-3 text-xs sm:text-sm">Настройки</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-5 flex gap-6 border-t border-gray-100 pt-4 text-sm">
+            <a href="{% url 'webinterface:profile_following' profile.pk %}" class="hover:text-brand">
+                <span class="font-bold text-ink" data-following-count>{{ following_count }}</span>
+                <span class="text-ink-muted">подписок</span>
+            </a>
+            <a href="{% url 'webinterface:profile_followers' profile.pk %}" class="hover:text-brand">
+                <span class="font-bold text-ink" data-followers-count>{{ followers_count }}</span>
+                <span class="text-ink-muted">подписчиков</span>
+            </a>
+        </div>
+    </section>
+
+    {% if year_stats %}
+    <section class="mt-6 rounded bg-white p-6 shadow-card"
+             data-year-stats
+             data-selected-year="{{ year_stats.selected_year }}"
+             data-year-stats-json="{{ year_stats_json|escape }}">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-base font-bold text-ink">Статистика</h2>
+            {% if year_stats.years|length > 1 %}
+            <div class="flex flex-wrap gap-1" role="group" aria-label="Год" data-year-switcher>
+                {% for year in year_stats.years %}
+                    <button type="button"
+                            class="btn-ghost !px-2 !py-1 text-xs{% if year == year_stats.selected_year %} !bg-gray-100 font-bold{% endif %}"
+                            data-year="{{ year }}"
+                            aria-pressed="{% if year == year_stats.selected_year %}true{% else %}false{% endif %}">
+                        {{ year }}
+                    </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4" data-year-stats-values>
+            <div>
+                <div class="stat-label">Расстояние</div>
+                <div class="stat-value">
+                    <span data-stat-distance>{{ year_stats.selected.distance }}</span><span class="stat-unit">км</span>
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Время</div>
+                <div class="stat-value" data-stat-duration>{{ year_stats.selected.duration_display }}</div>
+            </div>
+            <div>
+                <div class="stat-label">Набор высоты</div>
+                <div class="stat-value">
+                    <span data-stat-elevation>{{ year_stats.selected.elevation }}</span><span class="stat-unit">м</span>
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Тренировки</div>
+                <div class="stat-value" data-stat-count>{{ year_stats.selected.count_display }}</div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="mt-6">
+        <h2 class="mb-3 text-base font-bold text-ink">Тренировки</h2>
+        {% if activities %}
+            <div class="space-y-4">
+                {% for activity in activities %}
+                    <article class="overflow-hidden rounded bg-white shadow-card">
+                        <div class="px-4 pt-4">
+                            <div class="text-xs text-ink-muted">
+                                {{ activity.started_at|date:"d M Y, H:i" }}
+                                {% if activity.activity_type %} · {{ activity.activity_type.name }}{% endif %}
+                                {% if activity.is_indoor %}
+                                    · <span class="font-semibold text-ink">Indoor</span>
+                                {% endif %}
+                            </div>
+                            <h3 class="mt-1 text-lg font-bold">
+                                <a href="{% url 'webinterface:activity_detail' activity.pk %}" class="hover:text-brand">
+                                    {{ activity.title }}
+                                </a>
+                            </h3>
+                        </div>
+                        <div class="mt-3 grid grid-cols-3 gap-2 px-4 pb-4">
+                            <div>
+                                <div class="stat-label">Дистанция</div>
+                                <div class="text-lg font-bold">{{ activity.distance }} <span class="text-xs font-normal text-ink-muted">км</span></div>
+                            </div>
+                            <div>
+                                <div class="stat-label">Время</div>
+                                <div class="text-lg font-bold">{{ activity.duration_display }}</div>
+                            </div>
+                            {% if activity.avg_speed %}
+                            <div>
+                                <div class="stat-label">Ср. скорость</div>
+                                <div class="text-lg font-bold">{{ activity.avg_speed }} <span class="text-xs font-normal text-ink-muted">км/ч</span></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="rounded bg-white px-6 py-10 text-center shadow-card">
+                <p class="text-sm text-ink-muted">
+                    {% if is_own_profile %}
+                        У вас пока нет тренировок.
+                    {% elif not profile.is_public and not is_following %}
+                        {% if request_pending %}
+                            Закрытый профиль — запрос на подписку ожидает подтверждения.
+                        {% else %}
+                            Закрытый профиль — подпишитесь, чтобы видеть тренировки.
+                        {% endif %}
+                    {% else %}
+                        Пока нет тренировок.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/people.js' %}"></script>
+{% endblock %}

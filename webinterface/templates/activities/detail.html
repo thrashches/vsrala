@@ -1,36 +1,302 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ activity.title }}{% endblock title %}
+
 {% block content %}
-    <div class="container col-lg-6">
-
-        <div class="card m-3">
-
-            <h4 class="m-1">{{ activity.title }}</h4>
-
-        </div>
-        <div class="card m-3">
-            {{ map|safe }}
-        </div>
-        <div class="card m-3">
-            <div class="card-body">
-                <p>
-                    Дистанция: <b>{{ activity.distance }} км</b>
-                </p>
-                <p>
-                    Общее время: <b>{{ activity.duration }}</b>
-                </p>
-                <p>
-                    Время в движении: <b>{{ activity.duration_active }}</b>
-                </p>
-                <p>
-                    Средняя скорость: <b>{{ activity.avg_speed }}</b>
-                </p>
-                <p>
-                    Максимальная скорость: <b>{{ activity.max_speed }}</b>
-                </p>
+<div class="mx-auto max-w-4xl px-4 py-6">
+    <div class="relative rounded bg-white shadow-card">
+        <div class="border-b border-gray-100 px-5 py-4">
+            <div class="flex items-start gap-3">
+                {% include 'includes/person_avatar.html' with person=activity.profile avatar_class='h-12 w-12 text-base' %}
+                <div>
+                    <div class="text-sm font-semibold">
+                        <a href="{% url 'webinterface:profile_detail' activity.profile.pk %}" class="hover:text-brand">
+                            {{ activity.profile.display_name }}
+                        </a>
+                    </div>
+                    <div class="text-xs text-ink-muted">
+                        {{ activity.started_at|date:"d M Y, H:i" }}
+                        {% if activity.activity_type %} · {{ activity.activity_type.name }}{% endif %}
+                        {% if activity.is_indoor %}
+                            · <span class="font-semibold text-ink">Indoor</span>
+                        {% endif %}
+                    </div>
+                    <h1 class="mt-2 text-2xl font-bold text-ink">{{ activity.title }}</h1>
+                    {% if activity.description %}
+                        <p class="mt-2 text-sm text-ink-muted">{{ activity.description }}</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
+
+        <div class="grid grid-cols-2 gap-4 border-b border-gray-100 px-5 py-4 sm:grid-cols-3 lg:grid-cols-7">
+            <div>
+                <div class="stat-label">Расстояние</div>
+                <div class="stat-value">
+                    {% if activity.distance %}{{ activity.distance }}<span class="stat-unit">км</span>{% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Время</div>
+                <div class="stat-value">{{ activity.duration_display }}</div>
+            </div>
+            <div>
+                <div class="stat-label">Ср. скорость</div>
+                <div class="stat-value">
+                    {% if activity.avg_speed %}{{ activity.avg_speed }}<span class="stat-unit">км/ч</span>{% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Макс. скорость</div>
+                <div class="stat-value">
+                    {% if activity.max_speed %}{{ activity.max_speed }}<span class="stat-unit">км/ч</span>{% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Набор высоты</div>
+                <div class="stat-value">
+                    {% if activity.elevation_gain %}{{ activity.elevation_gain }}<span class="stat-unit">м</span>{% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">Ср. мощность</div>
+                <div class="stat-value">
+                    {% if activity.avg_power %}{{ activity.avg_power }}<span class="stat-unit">Вт</span>{% else %}—{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="stat-label">TSS</div>
+                <div class="stat-value">
+                    {% if activity.tss %}{{ activity.tss }}{% else %}—{% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if activity.track_points %}
+            <div class="relative z-0 overflow-hidden">
+                <div data-track-map data-interactive="true"
+                     data-points="{{ activity.track_points_json|escape }}"
+                     data-duration="{{ activity.duration.total_seconds|floatformat:0 }}"
+                     class="h-[420px] w-full bg-gray-100"></div>
+            </div>
+        {% endif %}
+
+        {% if activity.zone_timeline %}
+            <div class="border-t border-gray-100 px-5 py-4">
+                <h3 class="mb-2 text-sm font-semibold text-ink">
+                    {% if activity.zone_stream == 'power' %}Мощность по зонам{% elif activity.zone_stream == 'hr' %}Пульс по зонам{% else %}Зоны{% endif %}
+                </h3>
+                <img src="{{ activity.zone_timeline.url }}" alt="Таймлайн зон"
+                     class="w-full rounded border border-gray-100 bg-feed">
+            </div>
+        {% endif %}
+
+        {% if activity.streams.speed or activity.streams.hr or activity.streams.power or activity.streams.ele %}
+        <div id="activity-streams"
+             data-streams="{{ activity.streams_json|escape }}"
+             data-duration="{{ activity.duration.total_seconds|floatformat:0 }}"
+             class="space-y-4 border-t border-gray-100 px-5 py-5">
+            <div data-chart-panel>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Скорость</h3>
+                <div class="h-36">
+                    <canvas id="chart-speed"></canvas>
+                </div>
+            </div>
+            <div data-chart-panel>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Пульс</h3>
+                <div class="h-36">
+                    <canvas id="chart-hr"></canvas>
+                </div>
+            </div>
+            <div data-chart-panel>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Мощность</h3>
+                <div class="h-36">
+                    <canvas id="chart-power"></canvas>
+                </div>
+            </div>
+            <div data-chart-panel>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Высота</h3>
+                <div class="h-36">
+                    <canvas id="chart-ele"></canvas>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid gap-4 border-t border-gray-100 px-5 py-5 sm:grid-cols-2">
+            {% if activity.distance %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Расстояние</h3>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Расстояние</dt>
+                        <dd class="font-semibold text-ink">{{ activity.distance }} <span class="font-normal text-ink-muted">км</span></dd>
+                    </div>
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.duration or activity.duration_active %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Время</h3>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Общее</dt>
+                        <dd class="font-semibold text-ink">{{ activity.duration_display }}</dd>
+                    </div>
+                    {% if activity.duration_active %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">В движении</dt>
+                        <dd class="font-semibold text-ink">{{ activity.duration_active_display }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.avg_hr or activity.max_hr %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Пульс</h3>
+                <dl class="space-y-2 text-sm">
+                    {% if activity.avg_hr %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Средний</dt>
+                        <dd class="font-semibold text-ink">{{ activity.avg_hr }} <span class="font-normal text-ink-muted">уд/мин</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.max_hr %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Максимальный</dt>
+                        <dd class="font-semibold text-ink">{{ activity.max_hr }} <span class="font-normal text-ink-muted">уд/мин</span></dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.avg_power or activity.normalized_power or activity.max_power or activity.tss %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Мощность</h3>
+                <dl class="space-y-2 text-sm">
+                    {% if activity.avg_power %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Средняя</dt>
+                        <dd class="font-semibold text-ink">{{ activity.avg_power }} <span class="font-normal text-ink-muted">Вт</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.normalized_power %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Нормализованная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.normalized_power }} <span class="font-normal text-ink-muted">Вт</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.max_power %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Максимальная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.max_power }} <span class="font-normal text-ink-muted">Вт</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.tss %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">TSS</dt>
+                        <dd class="font-semibold text-ink">{{ activity.tss }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.avg_speed or activity.avg_moving_speed or activity.max_speed %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Скорость</h3>
+                <dl class="space-y-2 text-sm">
+                    {% if activity.avg_speed %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Средняя</dt>
+                        <dd class="font-semibold text-ink">{{ activity.avg_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.avg_moving_speed %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Средняя в движении</dt>
+                        <dd class="font-semibold text-ink">{{ activity.avg_moving_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.max_speed %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Максимальная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.max_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.avg_cadence or activity.max_cadence %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Частота вращения</h3>
+                <dl class="space-y-2 text-sm">
+                    {% if activity.avg_cadence %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Средняя</dt>
+                        <dd class="font-semibold text-ink">{{ activity.avg_cadence }} <span class="font-normal text-ink-muted">об/мин</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.max_cadence %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Максимальная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.max_cadence }} <span class="font-normal text-ink-muted">об/мин</span></dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+
+            {% if activity.elevation_min or activity.elevation_max or activity.elevation_gain or activity.elevation_loss %}
+            <div class="rounded border border-gray-200 px-4 py-3">
+                <h3 class="mb-3 text-sm font-semibold text-ink">Высота</h3>
+                <dl class="space-y-2 text-sm">
+                    {% if activity.elevation_min %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Минимальная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.elevation_min }} <span class="font-normal text-ink-muted">м</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.elevation_max %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Максимальная</dt>
+                        <dd class="font-semibold text-ink">{{ activity.elevation_max }} <span class="font-normal text-ink-muted">м</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.elevation_gain %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Набор высоты</dt>
+                        <dd class="font-semibold text-ink">{{ activity.elevation_gain }} <span class="font-normal text-ink-muted">м</span></dd>
+                    </div>
+                    {% endif %}
+                    {% if activity.elevation_loss %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-ink-muted">Спуск</dt>
+                        <dd class="font-semibold text-ink">{{ activity.elevation_loss }} <span class="font-normal text-ink-muted">м</span></dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="relative z-10 border-t border-gray-100 px-5 py-4">
+            {% include 'includes/activity_reactions.html' %}
+        </div>
+
+        {% include 'includes/activity_comments.html' %}
     </div>
-
-
+</div>
 {% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/activity-charts.js' %}"></script>
+<script src="{% static 'js/activity-reactions.js' %}"></script>
+<script src="{% static 'js/activity-comments.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Люди{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 py-6" data-people-search
+     data-search-url="{% url 'webinterface:people_search_api' %}">
+    <div>
+        <h1 class="text-xl font-bold text-ink">Люди</h1>
+        <p class="mt-1 text-sm text-ink-muted">Найдите спортсменов по имени или почте.</p>
+    </div>
+
+    <div class="mt-5">
+        <label class="sr-only" for="people-search-input">Поиск людей</label>
+        <input id="people-search-input"
+               type="search"
+               autocomplete="off"
+               placeholder="Имя или email…"
+               class="w-full rounded border border-gray-300 px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+               data-people-search-input>
+    </div>
+
+    <div class="mt-4 space-y-3" data-people-search-results>
+        <p class="px-1 py-8 text-center text-sm text-ink-muted" data-people-search-empty>
+            Начните вводить имя или email
+        </p>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/people.js' %}"></script>
+{% endblock %}

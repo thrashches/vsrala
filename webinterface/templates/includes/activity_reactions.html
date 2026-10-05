@@ -1,0 +1,38 @@
+<div class="activity-reactions"
+     data-react-url="{% url 'webinterface:activity_react' activity.pk %}"
+     data-mine="{{ activity.my_reaction|default:'' }}">
+    <div class="activity-reactions__chips" data-reaction-chips>
+        {% for item in activity.reaction_counts %}
+            <button type="button"
+                    class="reaction-chip{% if activity.my_reaction == item.emoji %} is-mine{% endif %}"
+                    data-emoji="{{ item.emoji }}"
+                    aria-pressed="{% if activity.my_reaction == item.emoji %}true{% else %}false{% endif %}">
+                <span class="reaction-chip__emoji">{{ item.emoji }}</span>
+                <span class="reaction-chip__count">{{ item.count }}</span>
+            </button>
+        {% endfor %}
+    </div>
+
+    <div class="activity-reactions__picker-wrap{% if activity.my_reaction %} is-hidden{% endif %}"
+         data-reaction-picker-wrap
+         {% if activity.my_reaction %}hidden{% endif %}>
+        <button type="button"
+                class="reaction-add-btn"
+                data-reaction-toggle
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-label="Добавить реакцию"
+                title="Реакция">
+            <span class="material-icons reaction-add-btn__icon" aria-hidden="true">thumb_up</span>
+        </button>
+        <div class="reaction-picker" data-reaction-picker hidden>
+            {% for emoji, label in reaction_choices %}
+                <button type="button"
+                        class="reaction-picker__btn{% if activity.my_reaction == emoji %} is-mine{% endif %}"
+                        data-emoji="{{ emoji }}"
+                        title="{{ label }}"
+                        aria-label="{{ label }}">{{ emoji }}</button>
+            {% endfor %}
+        </div>
+    </div>
+</div>

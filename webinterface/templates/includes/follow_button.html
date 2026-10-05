@@ -1,0 +1,10 @@
+{% if person.pk != user.pk %}
+    <button type="button"
+            class="follow-btn {% if person.is_following or person.request_pending %}btn-ghost{% else %}btn-brand{% endif %} text-xs sm:text-sm"
+            data-follow-url="{% url 'webinterface:profile_follow' person.pk %}"
+            data-following="{% if person.is_following %}1{% else %}0{% endif %}"
+            data-pending="{% if person.request_pending %}1{% else %}0{% endif %}"
+            aria-pressed="{% if person.is_following %}true{% else %}false{% endif %}">
+        {% if person.is_following %}Отписаться{% elif person.request_pending %}Запрос отправлен{% else %}Подписаться{% endif %}
+    </button>
+{% endif %}

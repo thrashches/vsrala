@@ -1,0 +1,57 @@
+<aside id="weekly-leaders"
+       class="rounded bg-white p-4 shadow-card"
+       data-api-url="{{ weekly_leaders_api_url }}"
+       data-profile-url-template="{% url 'webinterface:profile_detail' 0 %}">
+    <div class="flex items-baseline justify-between gap-2">
+        <h2 class="text-sm font-bold uppercase tracking-wide text-ink">Лидеры недели</h2>
+        <span data-week-label class="shrink-0 text-xs text-ink-muted">{{ weekly_leaders.week_label }}</span>
+    </div>
+
+    <div class="mt-3 space-y-0 divide-y divide-gray-100">
+        <div class="flex flex-wrap gap-1 pb-3" role="group" aria-label="Неделя">
+            <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                    data-week="current" aria-pressed="true">Эта</button>
+            <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                    data-week="previous" aria-pressed="false">Прошлая</button>
+        </div>
+
+        <div class="flex flex-wrap gap-1 py-3" role="group" aria-label="Метрика">
+            <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                    data-metric="distance" aria-pressed="true">Дистанция</button>
+            <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                    data-metric="duration" aria-pressed="false">Время</button>
+        </div>
+
+        <div class="flex flex-wrap gap-1 pt-3" role="group" aria-label="Вид спорта">
+            <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                    data-sport="" aria-pressed="true">Все</button>
+            {% for sport in activity_types %}
+                <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
+                        data-sport="{{ sport.pk }}" aria-pressed="false">{{ sport.name }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <ol data-leaders-list class="mt-4 space-y-2 border-t border-gray-100 pt-4">
+        {% for row in weekly_leaders.leaders %}
+            <li class="flex items-center gap-2">
+                <span class="w-5 shrink-0 text-center text-xs font-bold text-ink-muted">{{ row.rank }}</span>
+                <a href="{% url 'webinterface:profile_detail' row.profile_id %}"
+                   class="avatar h-8 w-8 shrink-0 text-xs">
+                    {% if row.photo_url %}
+                        <img src="{{ row.photo_url }}" alt="">
+                    {% else %}
+                        {{ row.initial }}
+                    {% endif %}
+                </a>
+                <a href="{% url 'webinterface:profile_detail' row.profile_id %}"
+                   class="min-w-0 flex-1 truncate text-sm font-medium hover:text-brand">
+                    {{ row.display_name }}
+                </a>
+                <span class="shrink-0 text-sm font-semibold tabular-nums">{{ row.total_display }}</span>
+            </li>
+        {% empty %}
+            <li data-empty class="py-4 text-center text-sm text-ink-muted">Нет тренировок за эту неделю</li>
+        {% endfor %}
+    </ol>
+</aside>
