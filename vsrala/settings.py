@@ -21,16 +21,40 @@ os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + str(BASE_DIR)
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-dl+5#e4wo=&a&(ak@(k_uh#4jedt6p&8986g*@x@c&81jg2&-%'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-dl+5#e4wo=&a&(ak@(k_uh#4jedt6p&8986g*@x@c&81jg2&-%',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', '1').lower() in ('1', 'true', 'yes', 'on')
+
+DOMAIN = os.environ.get('DOMAIN', '').strip()
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
     if host.strip()
 ]
+if DOMAIN and DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(DOMAIN)
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+if DOMAIN:
+    for scheme in ('https', 'http'):
+        origin = f'{scheme}://{DOMAIN}'
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+# За nginx / TLS-терминацией
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # Application definition

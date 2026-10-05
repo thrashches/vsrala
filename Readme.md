@@ -19,6 +19,103 @@ docker compose up --build
 docker compose exec backend python manage.py createsuperuser
 ```
 
+## Деплой на сервер (домен + HTTPS)
+
+Домен задаётся только в `.env` на сервере — в репозиторий его класть не нужно.
+
+### 1. DNS
+
+Создайте A-запись (и при необходимости AAAA) на IP сервера:
+
+```
+your-domain.example  →  <IP сервера>
+```
+
+Дождитесь распространения DNS (`dig +short your-domain.example`).
+
+### 2. Сервер
+
+Нужны Docker и Docker Compose plugin. Откройте порты **80** и **443**.
+
+```bash
+git clone <url-репозитория> vsrala
+cd vsrala
+cp .env.example .env
+```
+
+Заполните `.env`:
+
+```env
+DOMAIN=your-domain.example
+CERTBOT_EMAIL=you@example.com
+ENABLE_SSL=0
+
+DEBUG=0
+SECRET_KEY=<длинная-случайная-строка>
+ALLOWED_HOSTS=your-domain.example,backend,nginx
+
+POSTGRES_PASSWORD=<надёжный-пароль>
+```
+
+`CSRF_TRUSTED_ORIGINS` подставится из `DOMAIN` автоматически.
+
+### 3. Первый запуск и сертификат
+
+```bash
+chmod +x scripts/init-letsencrypt.sh
+./scripts/init-letsencrypt.sh
+```
+
+Скрипт:
+
+1. Поднимет стек по HTTP
+2. Получит сертификат Let's Encrypt (webroot)
+3. Пропишет `ENABLE_SSL=1` в `.env`
+4. Перезапустит nginx с HTTPS и включит автообновление сертификатов
+
+Проверка: https://your-domain.example
+
+Автообновление сертификатов (раз в неделю):
+
+```bash
+chmod +x scripts/renew-certs.sh
+crontab -e
+# добавить:
+0 3 * * 1 cd /path/to/vsrala && ./scripts/renew-certs.sh >> /var/log/vsrala-certbot.log 2>&1
+```
+
+Для тестового прогона Let's Encrypt (без лимитов rate-limit):
+
+```bash
+STAGING=1 ./scripts/init-letsencrypt.sh
+```
+
+После успешного staging удалите тестовый сертификат и запустите скрипт без `STAGING`:
+
+```bash
+docker compose --profile ssl run --rm --entrypoint certbot certbot delete --cert-name "$DOMAIN"
+./scripts/init-letsencrypt.sh
+```
+
+### 4. Смена домена
+
+1. Новая DNS A-запись
+2. В `.env`: новый `DOMAIN`, `ALLOWED_HOSTS`, `ENABLE_SSL=0`
+3. Снова `./scripts/init-letsencrypt.sh`
+
+### 5. Обычный перезапуск после обновления кода
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Создать суперпользователя:
+
+```bash
+docker compose exec backend python manage.py createsuperuser
+```
+
 ## Запуск dev-сервера (без Docker)
 
 Создаём venv (Python 3.9+):

@@ -3,13 +3,35 @@ services:
     image: nginx:1.27-alpine
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ENABLE_SSL: ${ENABLE_SSL:-0}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
       - static_data:/var/www/static:ro
       - media_data:/var/www/media:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
     depends_on:
       - backend
     restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    profiles:
+      - ssl
+    # Одноразовые команды: init-letsencrypt.sh / renew-certs.sh
+    # Долгоживущий контейнер не нужен — обновление через cron + scripts/renew-certs.sh
+    entrypoint: certbot
+    command: ["--help"]
+    restart: "no"
 
   database:
     image: postgres:16-alpine
@@ -80,3 +102,5 @@ volumes:
   redis_data:
   media_data:
   static_data:
+  certbot_www:
+  certbot_certs:
