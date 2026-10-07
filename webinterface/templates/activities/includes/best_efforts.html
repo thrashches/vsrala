@@ -1,0 +1,55 @@
+<div class="space-y-8">
+    <div>
+        <h3 class="mb-3 text-sm font-bold text-ink sm:text-base">Дистанция</h3>
+        {% if best_efforts.has_distance_efforts %}
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-left text-xs text-ink sm:text-sm">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-2 py-2 font-medium text-left sm:px-3">Дистанция</th>
+                            <th class="px-2 py-2 font-medium sm:px-3">Время</th>
+                            <th class="px-2 py-2 font-medium sm:px-3">Скорость</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in best_efforts.distance_efforts %}
+                        <tr class="border-b border-gray-200">
+                            <td class="px-2 py-2 sm:px-3 sm:py-2.5">{{ row.distance_display }}</td>
+                            <td class="px-2 py-2 tabular-nums sm:px-3 sm:py-2.5">{{ row.time_display }}</td>
+                            <td class="px-2 py-2 tabular-nums sm:px-3 sm:py-2.5">{{ row.speed_display }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="py-4 text-sm text-ink-muted">Недостаточно данных о дистанции</p>
+        {% endif %}
+    </div>
+
+    <div>
+        <h3 class="mb-3 text-sm font-bold text-ink sm:text-base">Мощность</h3>
+        {% if best_efforts.has_power_efforts %}
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-left text-xs text-ink sm:text-sm">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-2 py-2 font-medium sm:px-3">Время</th>
+                            <th class="px-2 py-2 font-medium sm:px-3">Мощность</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in best_efforts.power_efforts %}
+                        <tr class="border-b border-gray-200">
+                            <td class="px-2 py-2 sm:px-3 sm:py-2.5">{{ row.window_display }}</td>
+                            <td class="px-2 py-2 tabular-nums sm:px-3 sm:py-2.5">{{ row.watts_display }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="py-4 text-sm text-ink-muted">Нет данных о мощности</p>
+        {% endif %}
+    </div>
+</div>

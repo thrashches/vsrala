@@ -1,0 +1,38 @@
+{% if not has_stream %}
+    <p class="py-8 text-center text-sm text-ink-muted">{{ empty_message }}</p>
+{% elif not zones_configured %}
+    <div class="py-8 text-center text-sm text-ink-muted">
+        <p>{{ no_zones_message }}</p>
+        {% if show_settings_link %}
+            <p class="mt-3">
+                <a href="{% url 'webinterface:settings' %}" class="font-semibold text-brand hover:underline">Перейти в настройки</a>
+                и указать зоны.
+            </p>
+        {% endif %}
+    </div>
+{% else %}
+    {% if title %}<h3 class="mb-3 text-sm font-semibold text-ink">{{ title }}</h3>{% endif %}
+    <div class="grid grid-cols-[2.75rem_4.25rem_minmax(0,1fr)] gap-1 text-xs text-ink sm:grid-cols-[2.75rem_9.5rem_5.75rem_4.25rem_minmax(0,1fr)] sm:text-sm">
+        {% for row in rows %}
+            <div class="flex items-center justify-center rounded-sm bg-gray-100 px-1.5 py-2 font-semibold">{{ row.label }}</div>
+            <div class="hidden items-center overflow-hidden rounded-sm bg-gray-100 px-2.5 py-2 sm:flex">
+                <span class="truncate">{{ row.name }}</span>
+            </div>
+            <div class="hidden flex-col items-center justify-center rounded-sm bg-gray-100 px-2 py-1.5 tabular-nums leading-tight sm:flex">
+                <span>{{ row.range }}</span>
+                <span class="text-[10px] text-ink-muted sm:text-[11px]">{{ unit }}</span>
+            </div>
+            <div class="flex flex-col items-center justify-center rounded-sm bg-gray-100 px-2 py-1.5 tabular-nums leading-tight {% if row.has_time %}font-bold{% endif %}">
+                <span>{{ row.duration_display }}</span>
+                <span>{{ row.percent_display }}</span>
+            </div>
+            <div class="overflow-hidden rounded-sm bg-gray-100">
+                {% if row.has_time %}
+                    <div class="h-full min-h-[2.5rem]" style="width: {{ row.bar_percent }}%; background-color: {{ row.color }};"></div>
+                {% else %}
+                    <div class="min-h-[2.5rem]"></div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}

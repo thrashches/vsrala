@@ -12,6 +12,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 
+from activities.best_efforts import build_best_efforts
 from activities.comments import (
     COMMENT_TEXT_MAX_LENGTH,
     can_delete_comment,
@@ -27,6 +28,7 @@ from activities.models import Activity, ActivityComment, ActivityReaction, Activ
 from activities.parsers import TrackParseError, parse_track
 from activities.reactions import reaction_summary_for_activities, toggle_reaction
 from activities.year_stats import build_year_stats
+from activities.zone_distribution import compute_zone_distribution, stream_has_data
 from integrations.forms import IntervalsConnectForm
 from integrations.intervals_client import IntervalsApiError
 from integrations.models import IntervalsConnection
@@ -34,6 +36,7 @@ from integrations.sync import connect_profile, disconnect_profile
 from integrations.tasks import sync_connection
 from profiles.forms import DeleteAccountForm, PasswordChangeForm, ProfileSettingsForm
 from profiles.models import Follow, FollowRequest, Profile
+from profiles.zones import resolve_hr_zones, resolve_power_zones
 
 
 def _weekly_leaders_context(user):
@@ -197,17 +200,43 @@ class ActivityDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        points = self.object.track_points or []
+        activity = self.object
+        points = activity.track_points or []
+        streams = activity.streams or {}
         context['track_points_json'] = json.dumps(points)
-        context['streams_json'] = json.dumps(self.object.streams or {})
-        _attach_reactions([self.object], self.request.user)
+        context['streams_json'] = json.dumps(streams)
+        _attach_reactions([activity], self.request.user)
         context['reaction_choices'] = _reaction_choices()
-        comments = list(self.object.comments.select_related('profile').all())
+        comments = list(activity.comments.select_related('profile').all())
         for comment in comments:
             comment.can_edit = can_edit_comment(comment, self.request.user)
             comment.can_delete = can_delete_comment(comment, self.request.user)
         context['comments'] = comments
         context['comment_text_max_length'] = COMMENT_TEXT_MAX_LENGTH
+
+        is_owner = activity.profile_id == self.request.user.pk
+        hr_zones = resolve_hr_zones(activity.profile)
+        power_zones = resolve_power_zones(activity.profile)
+        has_hr = stream_has_data(streams.get('hr'))
+        has_power = stream_has_data(streams.get('power'))
+        times = streams.get('time') or []
+
+        context['has_hr_stream'] = has_hr
+        context['has_power_stream'] = has_power
+        context['hr_zones_configured'] = hr_zones is not None
+        context['power_zones_configured'] = power_zones is not None
+        context['show_zone_settings_link'] = is_owner
+        context['hr_zone_rows'] = (
+            compute_zone_distribution(streams.get('hr') or [], times, hr_zones)
+            if has_hr and hr_zones
+            else []
+        )
+        context['power_zone_rows'] = (
+            compute_zone_distribution(streams.get('power') or [], times, power_zones)
+            if has_power and power_zones
+            else []
+        )
+        context['best_efforts'] = build_best_efforts(activity)
         return context
 
 
