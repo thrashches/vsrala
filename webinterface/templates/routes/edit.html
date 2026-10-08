@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Изменить маршрут{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-lg px-4 py-10">
+    <div class="rounded bg-white p-6 shadow-card">
+        <h1 class="text-xl font-bold text-ink">Изменить маршрут</h1>
+        <p class="mt-1 text-sm text-ink-muted">{{ route.title|default:"Маршрут" }} · {{ route.distance }} км</p>
+
+        <form method="post" class="mt-6 space-y-5">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Название</label>
+                {{ form.title }}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Описание</label>
+                {{ form.description }}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Видимость</label>
+                {{ form.visibility }}
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="btn-brand flex-1">Сохранить</button>
+                <a href="{% url 'webinterface:route_detail' route.pk %}"
+                   class="flex-1 rounded border border-gray-200 px-3 py-2 text-center text-sm font-semibold hover:bg-gray-50">
+                    Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}

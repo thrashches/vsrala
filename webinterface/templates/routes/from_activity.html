@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Сохранить как маршрут{% endblock title %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 py-6">
+    <div class="rounded bg-white shadow-card">
+        <div class="border-b border-gray-100 px-5 py-4">
+            <h1 class="text-xl font-bold text-ink">Сохранить как маршрут</h1>
+            <p class="mt-1 text-sm text-ink-muted">
+                Из тренировки «{{ activity.title }}». Обрежьте начало и конец ползунками.
+            </p>
+        </div>
+
+        <div class="relative z-0 overflow-hidden">
+            <div id="trim-map" class="h-[360px] w-full bg-gray-100"></div>
+        </div>
+
+        <form method="post" class="space-y-5 px-5 py-5" id="trim-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            {{ form.start_idx }}
+            {{ form.end_idx }}
+
+            <div>
+                <div class="mb-1 flex justify-between text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    <span>Начало</span>
+                    <span id="start-label">0</span>
+                </div>
+                <input type="range" id="start-range" min="0" max="{{ points_count|add:'-1' }}" value="0"
+                       class="w-full accent-brand">
+            </div>
+            <div>
+                <div class="mb-1 flex justify-between text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    <span>Конец</span>
+                    <span id="end-label">{{ points_count|add:'-1' }}</span>
+                </div>
+                <input type="range" id="end-range" min="0" max="{{ points_count|add:'-1' }}"
+                       value="{{ points_count|add:'-1' }}"
+                       class="w-full accent-brand">
+            </div>
+            <p class="text-sm text-ink-muted">Выбрано точек: <span id="selected-count">{{ points_count }}</span></p>
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Название</label>
+                {{ form.title }}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Описание</label>
+                {{ form.description }}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Видимость</label>
+                {{ form.visibility }}
+            </div>
+
+            <div class="flex gap-3">
+                <button type="submit" class="btn-brand flex-1">Создать маршрут</button>
+                <a href="{% url 'webinterface:activity_detail' activity.pk %}"
+                   class="flex-1 rounded border border-gray-200 px-3 py-2 text-center text-sm font-semibold hover:bg-gray-50">
+                    Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  var points = {{ activity.track_points_json|safe }};
+  if (!points || points.length < 2 || !window.L) return;
+
+  var latlngs = points.map(function (p) { return [p[0], p[1]]; });
+  var map = L.map('trim-map', { attributionControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+
+  var fullLine = L.polyline(latlngs, { color: '#d1d5db', weight: 3, opacity: 0.8 }).addTo(map);
+  var selLine = L.polyline(latlngs, { color: '#FC5200', weight: 4, opacity: 0.95 }).addTo(map);
+  map.fitBounds(fullLine.getBounds(), { padding: [16, 16] });
+
+  var startInput = document.getElementById('id_start_idx');
+  var endInput = document.getElementById('id_end_idx');
+  var startRange = document.getElementById('start-range');
+  var endRange = document.getElementById('end-range');
+  var startLabel = document.getElementById('start-label');
+  var endLabel = document.getElementById('end-label');
+  var countEl = document.getElementById('selected-count');
+
+  function sync() {
+    var s = Number(startRange.value);
+    var e = Number(endRange.value);
+    if (s > e) {
+      var tmp = s; s = e; e = tmp;
+      startRange.value = s;
+      endRange.value = e;
+    }
+    startInput.value = s;
+    endInput.value = e;
+    startLabel.textContent = s;
+    endLabel.textContent = e;
+    countEl.textContent = e - s + 1;
+    selLine.setLatLngs(latlngs.slice(s, e + 1));
+  }
+
+  startRange.addEventListener('input', sync);
+  endRange.addEventListener('input', sync);
+  sync();
+})();
+</script>
+{% endblock %}

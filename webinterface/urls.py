@@ -18,6 +18,12 @@ from .views import (
     FollowRequestsView,
     FollowRequestActionView,
     WeeklyLeadersApiView,
+    RouteListView,
+    RouteDetailView,
+    RouteUploadView,
+    RouteFromActivityView,
+    RouteEditView,
+    RouteDeleteView,
 )
 
 
@@ -49,6 +55,16 @@ urlpatterns = [
     path('people/<int:pk>/followers/', ProfileFollowersView.as_view(), name='profile_followers'),
     path('people/<int:pk>/follow/', ProfileFollowToggleView.as_view(), name='profile_follow'),
     path('settings/', ProfileSettingsView.as_view(), name='settings'),
+    path('routes/', RouteListView.as_view(), name='route_list'),
+    path('routes/upload/', RouteUploadView.as_view(), name='route_upload'),
+    path(
+        'routes/from-activity/<int:activity_id>/',
+        RouteFromActivityView.as_view(),
+        name='route_from_activity',
+    ),
+    path('routes/<int:pk>/', RouteDetailView.as_view(), name='route_detail'),
+    path('routes/<int:pk>/edit/', RouteEditView.as_view(), name='route_edit'),
+    path('routes/<int:pk>/delete/', RouteDeleteView.as_view(), name='route_delete'),
     path('login/', LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
 ]

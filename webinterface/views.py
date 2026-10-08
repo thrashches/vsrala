@@ -37,6 +37,13 @@ from integrations.tasks import sync_connection
 from profiles.forms import DeleteAccountForm, PasswordChangeForm, ProfileSettingsForm
 from profiles.models import Follow, FollowRequest, Profile
 from profiles.zones import resolve_hr_zones, resolve_power_zones
+from routes.forms import RouteFromActivityForm, RouteMetaForm, RouteUploadForm
+from routes.models import Route
+from routes.services import (
+    create_route_from_activity,
+    create_route_from_gpx,
+    enqueue_surface_enrichment,
+)
 
 
 def _weekly_leaders_context(user):
@@ -223,6 +230,7 @@ class ActivityDetailView(LoginRequiredMixin, DetailView):
         has_power = stream_has_data(streams.get('power'))
         times = streams.get('time') or []
 
+        context['is_owner'] = is_owner
         context['has_hr_stream'] = has_hr
         context['has_power_stream'] = has_power
         context['hr_zones_configured'] = hr_zones is not None
@@ -740,3 +748,188 @@ class FollowRequestActionView(LoginRequiredMixin, View):
 
         next_url = request.POST.get('next') or reverse('webinterface:follow_requests')
         return redirect(next_url)
+
+
+# --- Routes ---
+
+
+class RouteListView(LoginRequiredMixin, ListView):
+    model = Route
+    template_name = 'routes/list.html'
+    context_object_name = 'routes'
+    paginate_by = 30
+
+    VALID_TABS = ('mine', 'following', 'public')
+
+    def get_tab(self):
+        tab = (self.request.GET.get('tab') or 'mine').strip()
+        return tab if tab in self.VALID_TABS else 'mine'
+
+    def get_queryset(self):
+        user = self.request.user
+        tab = self.get_tab()
+        base = Route.objects.select_related('profile').defer('track_points')
+        if tab == 'mine':
+            return base.filter(profile=user)
+        if tab == 'following':
+            following_ids = list(user.follows.values_list('pk', flat=True))
+            return base.filter(
+                profile_id__in=following_ids,
+                visibility__in=[Route.Visibility.FOLLOWERS, Route.Visibility.PUBLIC],
+            )
+        return base.filter(visibility=Route.Visibility.PUBLIC).exclude(profile=user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['tab'] = self.get_tab()
+        return context
+
+
+class RouteDetailView(LoginRequiredMixin, DetailView):
+    model = Route
+    template_name = 'routes/detail.html'
+    context_object_name = 'route'
+
+    def get_queryset(self):
+        return Route.objects.select_related('profile', 'source_activity')
+
+    def get_object(self, queryset=None):
+        route = super().get_object(queryset)
+        if not route.is_visible_to(self.request.user):
+            raise Http404
+        return route
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        route = self.object
+        context['is_owner'] = route.profile_id == self.request.user.pk
+        context['surface_summary'] = route.surface_summary()
+        return context
+
+
+class RouteUploadView(LoginRequiredMixin, View):
+    template_name = 'routes/upload.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {'form': RouteUploadForm()})
+
+    def post(self, request):
+        form = RouteUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        gpx = form.cleaned_data['source_gpx']
+        gpx.seek(0)
+        file_bytes = gpx.read()
+        try:
+            route = create_route_from_gpx(
+                profile=request.user,
+                file_bytes=file_bytes,
+                filename=gpx.name,
+                title=form.cleaned_data.get('title') or '',
+                description=form.cleaned_data.get('description') or '',
+                visibility=form.cleaned_data.get('visibility') or Route.Visibility.PRIVATE,
+            )
+        except TrackParseError as exc:
+            form.add_error('source_gpx', str(exc))
+            return render(request, self.template_name, {'form': form})
+
+        enqueue_surface_enrichment(route.pk)
+        messages.success(request, 'Маршрут создан')
+        return redirect('webinterface:route_detail', pk=route.pk)
+
+
+class RouteFromActivityView(LoginRequiredMixin, View):
+    template_name = 'routes/from_activity.html'
+
+    def _get_activity(self, request, activity_id):
+        activity = get_object_or_404(Activity, pk=activity_id)
+        if activity.profile_id != request.user.pk:
+            raise Http404
+        points = activity.track_points or []
+        if len(points) < 2:
+            raise Http404
+        return activity
+
+    def get(self, request, activity_id):
+        activity = self._get_activity(request, activity_id)
+        n = len(activity.track_points or [])
+        form = RouteFromActivityForm(initial={
+            'title': activity.title or '',
+            'start_idx': 0,
+            'end_idx': max(0, n - 1),
+            'visibility': Route.Visibility.PRIVATE,
+        })
+        return render(request, self.template_name, {
+            'form': form,
+            'activity': activity,
+            'points_count': n,
+        })
+
+    def post(self, request, activity_id):
+        activity = self._get_activity(request, activity_id)
+        form = RouteFromActivityForm(request.POST)
+        n = len(activity.track_points or [])
+        if not form.is_valid():
+            return render(request, self.template_name, {
+                'form': form,
+                'activity': activity,
+                'points_count': n,
+            })
+        try:
+            route = create_route_from_activity(
+                profile=request.user,
+                activity=activity,
+                start_idx=form.cleaned_data['start_idx'],
+                end_idx=form.cleaned_data['end_idx'],
+                title=form.cleaned_data.get('title') or '',
+                description=form.cleaned_data.get('description') or '',
+                visibility=form.cleaned_data.get('visibility') or Route.Visibility.PRIVATE,
+            )
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+            return render(request, self.template_name, {
+                'form': form,
+                'activity': activity,
+                'points_count': n,
+            })
+        enqueue_surface_enrichment(route.pk)
+        messages.success(request, 'Маршрут создан из тренировки')
+        return redirect('webinterface:route_detail', pk=route.pk)
+
+
+class RouteEditView(LoginRequiredMixin, View):
+    template_name = 'routes/edit.html'
+
+    def _get_owned(self, request, pk):
+        route = get_object_or_404(Route, pk=pk)
+        if route.profile_id != request.user.pk:
+            raise Http404
+        return route
+
+    def get(self, request, pk):
+        route = self._get_owned(request, pk)
+        return render(request, self.template_name, {
+            'form': RouteMetaForm(instance=route),
+            'route': route,
+        })
+
+    def post(self, request, pk):
+        route = self._get_owned(request, pk)
+        form = RouteMetaForm(request.POST, instance=route)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'route': route})
+        form.save()
+        messages.success(request, 'Маршрут обновлён')
+        return redirect('webinterface:route_detail', pk=route.pk)
+
+
+class RouteDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        route = get_object_or_404(Route, pk=pk)
+        if route.profile_id != request.user.pk:
+            raise Http404
+        route.delete()
+        messages.success(request, 'Маршрут удалён')
+        return redirect('webinterface:route_list')
+

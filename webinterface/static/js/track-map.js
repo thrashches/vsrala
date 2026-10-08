@@ -93,11 +93,52 @@
     var latlngs = timed.map(function (p) {
       return [p.lat, p.lon];
     });
-    var polyline = L.polyline(latlngs, {
-      color: '#FC5200',
-      weight: interactive ? 4 : 3,
-      opacity: 0.95,
-    }).addTo(map);
+
+    var SURFACE_COLORS = {
+      asphalt: '#FC5200',
+      concrete: '#ea580c',
+      paving_stones: '#f59e0b',
+      gravel: '#a16207',
+      dirt: '#78716c',
+      grass: '#16a34a',
+      unknown: '#9ca3af',
+    };
+
+    var segments = null;
+    var rawSeg = el.getAttribute('data-segments');
+    if (rawSeg) {
+      try {
+        segments = JSON.parse(rawSeg);
+      } catch (e) {
+        segments = null;
+      }
+    }
+
+    var boundsLayer;
+    if (segments && segments.length) {
+      var group = L.featureGroup();
+      segments.forEach(function (seg) {
+        var start = Math.max(0, Number(seg.start_idx) || 0);
+        var end = Math.min(latlngs.length - 1, Number(seg.end_idx) || 0);
+        if (end < start) return;
+        var slice = latlngs.slice(start, end + 1);
+        if (slice.length < 2) return;
+        var color = SURFACE_COLORS[seg.surface] || SURFACE_COLORS.unknown;
+        L.polyline(slice, {
+          color: color,
+          weight: interactive ? 4 : 3,
+          opacity: 0.95,
+        }).addTo(group);
+      });
+      group.addTo(map);
+      boundsLayer = group;
+    } else {
+      boundsLayer = L.polyline(latlngs, {
+        color: '#FC5200',
+        weight: interactive ? 4 : 3,
+        opacity: 0.95,
+      }).addTo(map);
+    }
 
     var markerR = interactive ? 7 : 5;
     L.circleMarker(latlngs[0], {
@@ -122,7 +163,7 @@
       }).addTo(map);
     }
 
-    map.fitBounds(polyline.getBounds(), { padding: [16, 16] });
+    map.fitBounds(boundsLayer.getBounds(), { padding: [16, 16] });
 
     setTimeout(function () {
       map.invalidateSize();

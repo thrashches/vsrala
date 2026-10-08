@@ -30,6 +30,13 @@
                     {% if activity.description %}
                         <p class="mt-2 text-sm text-ink-muted">{{ activity.description }}</p>
                     {% endif %}
+                    {% if is_owner and activity.track_points %}
+                        <a href="{% url 'webinterface:route_from_activity' activity.pk %}"
+                           class="mt-3 inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-gray-50">
+                            <span class="material-icons text-[18px] leading-none" aria-hidden="true">route</span>
+                            Сохранить как маршрут
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'user_medias.apps.UserMediasConfig',
     'webinterface.apps.WebinterfaceConfig',
     'integrations.apps.IntegrationsConfig',
+    'routes.apps.RoutesConfig',
 ]
 
 MIDDLEWARE = [
@@ -198,3 +199,10 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 15 * 60,
     },
 }
+
+# Overpass API (route surface enrichment)
+OVERPASS_URL = os.environ.get('OVERPASS_URL', 'https://overpass-api.de/api/interpreter')
+OVERPASS_USER_AGENT = os.environ.get(
+    'OVERPASS_USER_AGENT',
+    'vsrala/1.0 (route surfaces; https://github.com/null0ff/vsrala)',
+)
