@@ -120,6 +120,7 @@ class FeedView(LoginRequiredMixin, ListView):
             )
             .select_related('profile', 'activity_type')
             .prefetch_related('medias')
+            .defer('streams', 'track_points')
             .order_by('-started_at')
         )
 
@@ -143,6 +144,7 @@ class MyActivitiesView(LoginRequiredMixin, ListView):
             Activity.objects.filter(profile=self.request.user)
             .select_related('profile', 'activity_type')
             .prefetch_related('medias')
+            .defer('streams', 'track_points')
             .order_by('-started_at')
         )
 
@@ -485,7 +487,9 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
         activity.apply_parsed_track(parsed)
         activity.track_file = ContentFile(file_bytes, name=filename)
         activity.save()
+        from activities.map_preview import apply_map_preview
         from activities.zone_timeline import apply_zone_timeline
+        apply_map_preview(activity)
         apply_zone_timeline(activity)
         self.object = activity
         messages.success(self.request, 'Тренировка загружена')

@@ -80,6 +80,10 @@ class Activity(models.Model):
         max_length=16, blank=True, default='',
         verbose_name='поток для таймлайна зон',
     )
+    map_preview = models.ImageField(
+        blank=True, null=True, upload_to='activity_maps',
+        verbose_name='превью карты',
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='дата загрузки')
     started_at = models.DateTimeField(verbose_name='время начала тренировки')
     track_file = models.FileField(blank=True, null=True, upload_to='activities', verbose_name='файл тренировки')

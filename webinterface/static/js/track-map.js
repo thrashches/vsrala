@@ -77,6 +77,10 @@
       attributionControl: interactive,
     });
 
+    if (interactive && map.attributionControl) {
+      map.attributionControl.setPrefix(false);
+    }
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       // OSM blocks tiles without Referer (403 "Access blocked")

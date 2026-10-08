@@ -177,7 +177,9 @@ def import_remote_activity(
         logger.info('Intervals sync: duplicate %s skipped', activity_id)
         return None
 
+    from activities.map_preview import apply_map_preview
     from activities.zone_timeline import apply_zone_timeline
+    apply_map_preview(activity)
     apply_zone_timeline(activity)
     return activity
 

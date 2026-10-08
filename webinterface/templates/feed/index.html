@@ -67,18 +67,19 @@
                                 {% endif %}
                             </div>
 
-                            {% if activity.track_points %}
+                            {% if activity.map_preview %}
                                 <div class="relative z-0 mt-4 overflow-hidden">
                                     <a href="{% url 'webinterface:activity_detail' activity.pk %}" class="block">
-                                        <div data-track-map data-interactive="false"
-                                             data-points="{{ activity.track_points_json|escape }}"
-                                             class="h-52 w-full bg-gray-100"></div>
+                                        <img src="{{ activity.map_preview.url }}" alt="Маршрут"
+                                             loading="lazy" decoding="async"
+                                             class="h-52 w-full object-cover bg-feed">
                                     </a>
                                 </div>
                             {% elif activity.zone_timeline %}
                                 <div class="mt-4">
                                     <a href="{% url 'webinterface:activity_detail' activity.pk %}" class="block">
                                         <img src="{{ activity.zone_timeline.url }}" alt="Зоны тренировки"
+                                             loading="lazy" decoding="async"
                                              class="h-40 w-full object-cover object-left bg-feed">
                                     </a>
                                 </div>
@@ -86,7 +87,9 @@
                                 {% for media in activity.medias.all %}
                                     {% if forloop.first %}
                                         <div class="mt-4">
-                                            <img src="{{ media.image.url }}" alt="" class="h-52 w-full object-cover">
+                                            <img src="{{ media.image.url }}" alt=""
+                                                 loading="lazy" decoding="async"
+                                                 class="h-52 w-full object-cover">
                                         </div>
                                     {% endif %}
                                 {% endfor %}
