@@ -23,6 +23,7 @@ from .views import (
     RouteUploadView,
     RouteFromActivityView,
     RouteEditView,
+    RouteGpxDownloadView,
     RouteDeleteView,
 )
 
@@ -63,6 +64,7 @@ urlpatterns = [
         name='route_from_activity',
     ),
     path('routes/<int:pk>/', RouteDetailView.as_view(), name='route_detail'),
+    path('routes/<int:pk>/gpx/', RouteGpxDownloadView.as_view(), name='route_gpx'),
     path('routes/<int:pk>/edit/', RouteEditView.as_view(), name='route_edit'),
     path('routes/<int:pk>/delete/', RouteDeleteView.as_view(), name='route_delete'),
     path('login/', LoginView.as_view(template_name='registration/login.html'), name='login'),

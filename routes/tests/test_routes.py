@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+import gpxpy
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -254,3 +256,66 @@ class SurfaceEnrichmentTest(TestCase):
             pass
         self.route.refresh_from_db()
         self.assertEqual(self.route.surface_status, Route.SurfaceStatus.FAILED)
+
+
+class RouteGpxDownloadTest(TestCase):
+    def setUp(self):
+        self.owner = _user('gpx-owner@example.com')
+        self.stranger = _user('gpx-stranger@example.com')
+        self.client = Client()
+
+    def _private_route(self, **kwargs):
+        defaults = {
+            'profile': self.owner,
+            'title': 'Мой маршрут',
+            'visibility': Route.Visibility.PRIVATE,
+            'track_points': [[55.75, 37.60], [55.76, 37.61]],
+            'distance': 1,
+        }
+        defaults.update(kwargs)
+        return Route.objects.create(**defaults)
+
+    def test_owner_downloads_generated_gpx(self):
+        route = self._private_route()
+        self.client.login(email='gpx-owner@example.com', password='pass12345')
+        resp = self.client.get(reverse('webinterface:route_gpx', kwargs={'pk': route.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/gpx+xml')
+        disposition = resp['Content-Disposition']
+        self.assertIn('attachment', disposition)
+        self.assertIn('.gpx', disposition)
+
+        body = b''.join(resp.streaming_content)
+        parsed = gpxpy.parse(body.decode('utf-8'))
+        point = parsed.tracks[0].segments[0].points[0]
+        self.assertAlmostEqual(point.latitude, 55.75)
+        self.assertAlmostEqual(point.longitude, 37.60)
+        self.assertEqual(parsed.name, 'Мой маршрут')
+
+    def test_stranger_cannot_download_private_route(self):
+        route = self._private_route()
+        self.client.login(email='gpx-stranger@example.com', password='pass12345')
+        resp = self.client.get(reverse('webinterface:route_gpx', kwargs={'pk': route.pk}))
+        self.assertEqual(resp.status_code, 404)
+
+    @override_settings(MEDIA_ROOT='/tmp/vsrala_test_media_routes')
+    def test_source_gpx_is_served_as_is(self):
+        original = GPX_FIXTURE.read_bytes()
+        route = self._private_route(title='Uploaded')
+        route.source_gpx.save('sample.gpx', ContentFile(original), save=True)
+        self.client.login(email='gpx-owner@example.com', password='pass12345')
+        resp = self.client.get(reverse('webinterface:route_gpx', kwargs={'pk': route.pk}))
+        self.assertEqual(resp.status_code, 200)
+        body = b''.join(resp.streaming_content)
+        self.assertEqual(body, original)
+
+    def test_list_and_detail_show_download_link(self):
+        route = self._private_route(visibility=Route.Visibility.PUBLIC, title='Public ride')
+        self.client.login(email='gpx-stranger@example.com', password='pass12345')
+        gpx_url = reverse('webinterface:route_gpx', kwargs={'pk': route.pk})
+        list_resp = self.client.get(reverse('webinterface:route_list') + '?tab=public')
+        self.assertContains(list_resp, gpx_url)
+        self.assertContains(list_resp, 'Скачать GPX')
+        detail_resp = self.client.get(reverse('webinterface:route_detail', kwargs={'pk': route.pk}))
+        self.assertContains(detail_resp, gpx_url)
+        self.assertContains(detail_resp, 'Скачать GPX')

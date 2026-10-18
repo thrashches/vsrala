@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -43,6 +43,7 @@ from routes.services import (
     create_route_from_activity,
     create_route_from_gpx,
     enqueue_surface_enrichment,
+    route_gpx_stream,
 )
 
 
@@ -920,6 +921,23 @@ class RouteEditView(LoginRequiredMixin, View):
         form.save()
         messages.success(request, 'Маршрут обновлён')
         return redirect('webinterface:route_detail', pk=route.pk)
+
+
+class RouteGpxDownloadView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        route = get_object_or_404(Route, pk=pk)
+        if not route.is_visible_to(request.user):
+            raise Http404
+        opened = route_gpx_stream(route)
+        if opened is None:
+            raise Http404
+        stream, filename = opened
+        return FileResponse(
+            stream,
+            as_attachment=True,
+            filename=filename,
+            content_type='application/gpx+xml',
+        )
 
 
 class RouteDeleteView(LoginRequiredMixin, View):

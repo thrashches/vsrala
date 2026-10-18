@@ -29,8 +29,11 @@
                         {% endif %}
                     </div>
                 </div>
-                {% if is_owner %}
-                    <div class="flex gap-2">
+                <div class="flex gap-2">
+                    <a href="{% url 'webinterface:route_gpx' route.pk %}"
+                       class="rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50"
+                       download>Скачать GPX</a>
+                    {% if is_owner %}
                         <a href="{% url 'webinterface:route_edit' route.pk %}"
                            class="rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50">Изменить</a>
                         <form method="post" action="{% url 'webinterface:route_delete' route.pk %}"
@@ -41,8 +44,8 @@
                                 Удалить
                             </button>
                         </form>
-                    </div>
-                {% endif %}
+                    {% endif %}
+                </div>
             </div>
         </div>
 

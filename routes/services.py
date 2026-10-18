@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
+from io import BytesIO
+
+import gpxpy
+import gpxpy.gpx
+from django.core.files.base import ContentFile
 
 from activities.map_preview import (
     PREVIEW_FILENAME,
@@ -127,3 +133,67 @@ def create_route_from_activity(
 def enqueue_surface_enrichment(route_id: int) -> None:
     from .tasks import enrich_route_surfaces
     enrich_route_surfaces.delay(route_id)
+
+
+_UNSAFE_FILENAME = re.compile(r'[\x00-\x1f\\/:*?"<>|]+')
+
+
+def gpx_download_filename(route: Route) -> str:
+    title = _UNSAFE_FILENAME.sub('', (route.title or '').strip())
+    title = re.sub(r'\s+', ' ', title).strip().rstrip('.')
+    if not title:
+        return f'route-{route.pk}.gpx'
+    if not title.lower().endswith('.gpx'):
+        title = f'{title}.gpx'
+    return title
+
+
+def _track_lat_lon(route: Route) -> list[tuple[float, float]]:
+    points = []
+    for point in route.track_points or []:
+        if not point or len(point) < 2:
+            continue
+        try:
+            points.append((float(point[0]), float(point[1])))
+        except (TypeError, ValueError):
+            continue
+    return points
+
+
+def build_route_gpx(route: Route) -> bytes | None:
+    """GPX track from stored [lat, lon] points. Elevation and time are not kept."""
+    coords = _track_lat_lon(route)
+    if len(coords) < 2:
+        return None
+
+    name = (route.title or '').strip() or f'Route {route.pk}'
+    gpx = gpxpy.gpx.GPX()
+    gpx.name = name
+    description = (route.description or '').strip()
+    if description:
+        gpx.description = description
+
+    track = gpxpy.gpx.GPXTrack(name=name)
+    gpx.tracks.append(track)
+    segment = gpxpy.gpx.GPXTrackSegment()
+    track.segments.append(segment)
+    for lat, lon in coords:
+        segment.points.append(gpxpy.gpx.GPXTrackPoint(latitude=lat, longitude=lon))
+    return gpx.to_xml().encode('utf-8')
+
+
+def route_gpx_stream(route: Route):
+    """Return (binary stream, filename) for download, or None when there is nothing to send."""
+    filename = gpx_download_filename(route)
+    if route.source_gpx:
+        try:
+            route.source_gpx.open('rb')
+        except (OSError, ValueError):
+            pass
+        else:
+            return route.source_gpx, filename
+
+    content = build_route_gpx(route)
+    if content is None:
+        return None
+    return BytesIO(content), filename

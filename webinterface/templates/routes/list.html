@@ -27,8 +27,22 @@
     {% if routes %}
         <div class="space-y-4">
             {% for route in routes %}
-                <article class="overflow-hidden rounded bg-white shadow-card">
-                    <div class="flex items-start gap-3 px-4 pt-4">
+                <article class="relative overflow-hidden rounded bg-white shadow-card">
+                    <a href="{% url 'webinterface:route_gpx' route.pk %}"
+                       class="absolute z-10 inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-ink-muted hover:bg-gray-50 hover:text-ink"
+                       style="right:12px;top:12px"
+                       download
+                       title="Скачать GPX"
+                       aria-label="Скачать GPX">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             width="16" height="16" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </a>
+                    <div class="flex items-start gap-3 px-4 pt-4" style="padding-right:3.5rem">
                         {% include 'includes/person_avatar.html' with person=route.profile %}
                         <div class="min-w-0 flex-1">
                             <div class="text-sm font-semibold text-ink">
