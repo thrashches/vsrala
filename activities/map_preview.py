@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from io import BytesIO
 from typing import Optional
 
@@ -34,10 +35,40 @@ TILE_HEADERS = {
     'Referer': 'https://vsrala.local/',
 }
 TILE_TIMEOUT = 8
+TILE_RETRIES = 3
+TILE_RETRY_BACKOFF = 0.4
+TILE_REQUEST_INTERVAL = 0.15
+TILE_MISSING_RETRY_DELAY = 0.5
 
-# Process-wide tile cache to speed up batch regeneration.
-_TILE_CACHE: dict[tuple[int, int, int], Optional[Image.Image]] = {}
+# Process-wide tile cache to speed up batch regeneration (successful tiles only).
+_TILE_CACHE: dict[tuple[int, int, int], Image.Image] = {}
 _TILE_CACHE_MAX = 512
+_TILE_SESSION: Optional[requests.Session] = None
+_LAST_TILE_REQUEST_AT = 0.0
+
+
+def _tile_session() -> requests.Session:
+    global _TILE_SESSION
+    if _TILE_SESSION is None:
+        _TILE_SESSION = requests.Session()
+        _TILE_SESSION.headers.update(TILE_HEADERS)
+    return _TILE_SESSION
+
+
+def _throttle_tile_request() -> None:
+    global _LAST_TILE_REQUEST_AT
+    now = time.monotonic()
+    wait = TILE_REQUEST_INTERVAL - (now - _LAST_TILE_REQUEST_AT)
+    if wait > 0:
+        time.sleep(wait)
+    _LAST_TILE_REQUEST_AT = time.monotonic()
+
+
+def _cache_successful_tile(key: tuple[int, int, int], tile: Image.Image) -> None:
+    if len(_TILE_CACHE) >= _TILE_CACHE_MAX and key not in _TILE_CACHE:
+        # Drop an arbitrary old entry (FIFO-ish via dict order).
+        _TILE_CACHE.pop(next(iter(_TILE_CACHE)))
+    _TILE_CACHE[key] = tile
 
 
 def _extract_latlngs(track_points: list) -> list[tuple[float, float]]:
@@ -99,6 +130,22 @@ def _choose_zoom(min_lat: float, max_lat: float, min_lon: float, max_lon: float)
     return chosen
 
 
+def _is_retryable_http_error(exc: BaseException) -> bool:
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return False
+
+
+def _download_tile(url: str) -> Image.Image:
+    _throttle_tile_request()
+    resp = _tile_session().get(url, timeout=TILE_TIMEOUT)
+    resp.raise_for_status()
+    return Image.open(BytesIO(resp.content)).convert('RGB')
+
+
 def _fetch_tile(z: int, x: int, y: int, cache: dict) -> Optional[Image.Image]:
     key = (z, x, y)
     if key in cache:
@@ -109,22 +156,42 @@ def _fetch_tile(z: int, x: int, y: int, cache: dict) -> Optional[Image.Image]:
         return tile
     n = 2 ** z
     if x < 0 or y < 0 or x >= n or y >= n:
+        # Permanent miss for this compose; do not hit the network again.
         cache[key] = None
         return None
+
     url = TILE_URL.format(z=z, x=x, y=y)
-    try:
-        resp = requests.get(url, headers=TILE_HEADERS, timeout=TILE_TIMEOUT)
-        resp.raise_for_status()
-        tile = Image.open(BytesIO(resp.content)).convert('RGB')
-    except Exception:
-        logger.warning('Failed to fetch map tile %s', url, exc_info=True)
-        tile = None
-    cache[key] = tile
-    if len(_TILE_CACHE) >= _TILE_CACHE_MAX:
-        # Drop an arbitrary old entry (FIFO-ish via dict order).
-        _TILE_CACHE.pop(next(iter(_TILE_CACHE)))
-    _TILE_CACHE[key] = tile
-    return tile
+    last_exc: Optional[BaseException] = None
+    for attempt in range(TILE_RETRIES):
+        try:
+            tile = _download_tile(url)
+            cache[key] = tile
+            _cache_successful_tile(key, tile)
+            return tile
+        except requests.HTTPError as exc:
+            last_exc = exc
+            if not _is_retryable_http_error(exc) or attempt + 1 >= TILE_RETRIES:
+                break
+            time.sleep(TILE_RETRY_BACKOFF * (2 ** attempt))
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_exc = exc
+            if attempt + 1 >= TILE_RETRIES:
+                break
+            time.sleep(TILE_RETRY_BACKOFF * (2 ** attempt))
+        except Exception as exc:
+            last_exc = exc
+            break
+
+    logger.warning('Failed to fetch map tile %s', url, exc_info=last_exc)
+    return None
+
+
+def _paste_tile(
+    img: Image.Image, tile: Image.Image, tx: int, ty: int, left: float, top: float,
+) -> None:
+    px = int(tx * TILE_SIZE - left)
+    py = int(ty * TILE_SIZE - top)
+    img.paste(tile, (px, py))
 
 
 def _compose_basemap(
@@ -140,14 +207,34 @@ def _compose_basemap(
     x1 = int(math.floor((left + IMG_WIDTH) / TILE_SIZE))
     y1 = int(math.floor((top + IMG_HEIGHT) / TILE_SIZE))
 
+    n = 2 ** zoom
+    missing: list[tuple[int, int]] = []
     for ty in range(y0, y1 + 1):
         for tx in range(x0, x1 + 1):
             tile = _fetch_tile(zoom, tx, ty, local_cache)
             if tile is None:
+                if 0 <= tx < n and 0 <= ty < n:
+                    missing.append((tx, ty))
                 continue
-            px = int(tx * TILE_SIZE - left)
-            py = int(ty * TILE_SIZE - top)
-            img.paste(tile, (px, py))
+            _paste_tile(img, tile, tx, ty, left, top)
+
+    if missing:
+        time.sleep(TILE_MISSING_RETRY_DELAY)
+        still_missing: list[tuple[int, int]] = []
+        for tx, ty in missing:
+            # Network failures are not cached; OOB misses stay None in local_cache.
+            tile = _fetch_tile(zoom, tx, ty, local_cache)
+            if tile is None:
+                still_missing.append((tx, ty))
+                continue
+            _paste_tile(img, tile, tx, ty, left, top)
+        if still_missing:
+            logger.warning(
+                'Map preview basemap incomplete: %d/%d tiles missing at z=%d',
+                len(still_missing),
+                (x1 - x0 + 1) * (y1 - y0 + 1),
+                zoom,
+            )
     return img
 
 
