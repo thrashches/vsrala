@@ -1,4 +1,4 @@
-"""Generate static map preview PNGs from activity track points."""
+"""Generate static map preview images from activity track points."""
 
 from __future__ import annotations
 
@@ -28,6 +28,11 @@ LINE_WIDTH = 4
 START_FILL = (34, 197, 94)
 END_FILL = (239, 68, 68)
 MARKER_R = 7
+
+PREVIEW_FORMAT = 'WEBP'
+PREVIEW_FILENAME = 'map_preview.webp'
+PREVIEW_QUALITY = 80
+PREVIEW_METHOD = 4
 
 TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 TILE_HEADERS = {
@@ -289,13 +294,22 @@ def render_map_preview_image(
     return img
 
 
+def image_to_map_preview_content(img: Image.Image) -> ContentFile:
+    buf = BytesIO()
+    img.save(
+        buf,
+        format=PREVIEW_FORMAT,
+        quality=PREVIEW_QUALITY,
+        method=PREVIEW_METHOD,
+    )
+    return ContentFile(buf.getvalue(), name=PREVIEW_FILENAME)
+
+
 def build_map_preview_for_activity(activity) -> Optional[ContentFile]:
     img = render_map_preview_image(activity.track_points or [])
     if img is None:
         return None
-    buf = BytesIO()
-    img.save(buf, format='PNG', optimize=True)
-    return ContentFile(buf.getvalue(), name='map_preview.png')
+    return image_to_map_preview_content(img)
 
 
 def apply_map_preview(activity, *, save: bool = True) -> bool:
@@ -312,7 +326,7 @@ def apply_map_preview(activity, *, save: bool = True) -> bool:
 
     if old_name:
         activity.map_preview.delete(save=False)
-    activity.map_preview.save('map_preview.png', content, save=False)
+    activity.map_preview.save(PREVIEW_FILENAME, content, save=False)
     if save and activity.pk:
         activity.save(update_fields=['map_preview'])
     return True

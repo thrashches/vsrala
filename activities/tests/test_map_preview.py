@@ -13,8 +13,10 @@ from activities.map_preview import (
     BG,
     IMG_HEIGHT,
     MAX_TRACK_HEIGHT_RATIO,
+    PREVIEW_FILENAME,
     apply_map_preview,
     build_map_preview_for_activity,
+    image_to_map_preview_content,
     render_map_preview_image,
     _choose_zoom,
     _compose_basemap,
@@ -104,8 +106,19 @@ class MapPreviewApplyTest(TestCase):
         self.assertTrue(apply_map_preview(activity))
         activity.refresh_from_db()
         self.assertTrue(activity.map_preview.name)
+        self.assertTrue(activity.map_preview.name.endswith('.webp'))
         content = build_map_preview_for_activity(activity)
         self.assertIsNotNone(content)
+        self.assertEqual(content.name, PREVIEW_FILENAME)
+        self.assertTrue(content.read()[:4] == b'RIFF')
+
+    def test_preview_content_is_webp(self):
+        img = Image.new('RGB', (32, 32), (200, 210, 220))
+        content = image_to_map_preview_content(img)
+        self.assertEqual(content.name, PREVIEW_FILENAME)
+        data = content.read()
+        self.assertTrue(data.startswith(b'RIFF'))
+        self.assertIn(b'WEBP', data[:16])
 
     def test_no_preview_without_gps(self):
         activity = Activity.objects.create(

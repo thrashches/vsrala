@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from io import BytesIO
 
-from django.core.files.base import ContentFile
-
-from activities.map_preview import render_map_preview_image
+from activities.map_preview import (
+    PREVIEW_FILENAME,
+    image_to_map_preview_content,
+    render_map_preview_image,
+)
 from activities.parsers import ParsedTrack, TrackParseError, parse_track
 
 from .models import Route, distance_km_from_points, strip_time_from_points
@@ -24,16 +25,13 @@ def apply_route_map_preview(route: Route, *, save: bool = True) -> bool:
             route.save(update_fields=['map_preview'])
         return False
 
-    buf = BytesIO()
-    img.save(buf, format='PNG', optimize=True)
-    content = ContentFile(buf.getvalue(), name='map_preview.png')
+    content = image_to_map_preview_content(img)
     if old_name:
         route.map_preview.delete(save=False)
-    route.map_preview.save('map_preview.png', content, save=False)
+    route.map_preview.save(PREVIEW_FILENAME, content, save=False)
     if save and route.pk:
         route.save(update_fields=['map_preview'])
     return True
-
 
 def points_from_parsed(parsed: ParsedTrack) -> list:
     return strip_time_from_points(parsed.points or [])
