@@ -42,6 +42,12 @@ class Profile(AbstractUser):
     username = None
     email = models.EmailField(_('email address'), unique=True)
     photo = models.ImageField(upload_to='pictures', blank=True, null=True, verbose_name='фото профиля')
+    photo_preview = models.ImageField(
+        upload_to='pictures/previews',
+        blank=True,
+        null=True,
+        verbose_name='превью аватара',
+    )
     telegram = models.CharField(max_length=255, blank=True, verbose_name='Telegram')
     instagram = models.CharField(max_length=255, blank=True, verbose_name='Instagram')
     vk = models.CharField(max_length=255, blank=True, verbose_name='VK')
@@ -64,6 +70,21 @@ class Profile(AbstractUser):
     @property
     def display_name(self):
         return (self.first_name or '').strip() or self.email
+
+    @property
+    def avatar_url(self):
+        """Optimized WebP preview for UI circles; falls back to original photo."""
+        if self.photo_preview:
+            try:
+                return self.photo_preview.url
+            except ValueError:
+                pass
+        if self.photo:
+            try:
+                return self.photo.url
+            except ValueError:
+                pass
+        return None
 
 
 class Follow(models.Model):

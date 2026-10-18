@@ -1,7 +1,10 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
-from .models import FollowRequest, Profile
 from django.utils.translation import gettext_lazy as _
+
+from .models import FollowRequest, Profile
+from .photo_preview import apply_photo_preview, clear_photo_preview
+from .tasks import generate_photo_previews_for_profiles
 
 
 class FollowsInline(admin.TabularInline):
@@ -16,7 +19,7 @@ class ProfileAdmin(UserAdmin):
         (None, {'fields': ('email', 'password')}),
         (_('Personal info'), {
             'fields': (
-                'first_name', 'last_name', 'photo',
+                'first_name', 'last_name', 'photo', 'photo_preview',
                 'telegram', 'instagram', 'vk', 'is_public',
             ),
         }),
@@ -24,6 +27,7 @@ class ProfileAdmin(UserAdmin):
                                        'groups', 'user_permissions')}),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
+    readonly_fields = ('photo_preview',)
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
@@ -36,6 +40,28 @@ class ProfileAdmin(UserAdmin):
     inlines = [
         FollowsInline,
     ]
+    actions = ['enqueue_photo_preview_generation']
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if 'photo' in form.changed_data:
+            if obj.photo:
+                apply_photo_preview(obj)
+            else:
+                clear_photo_preview(obj)
+
+    @admin.action(description='Сгенерировать превью аватара (фоном)')
+    def enqueue_photo_preview_generation(self, request, queryset):
+        profile_ids = list(queryset.values_list('pk', flat=True))
+        if not profile_ids:
+            self.message_user(request, 'Не выбран ни один профиль.', messages.WARNING)
+            return
+        generate_photo_previews_for_profiles.delay(profile_ids)
+        self.message_user(
+            request,
+            f'Запущена фоновая генерация превью аватара для {len(profile_ids)} профил(ей).',
+            messages.SUCCESS,
+        )
 
 
 @admin.register(FollowRequest)

@@ -1,8 +1,11 @@
+import os
+
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm as DjangoPasswordChangeForm
 from django.core.exceptions import ValidationError
 
 from profiles.models import Profile
+from profiles.photo_preview import apply_photo_preview, clear_photo_preview
 from profiles.zones import (
     HR_ZONE_NAMES,
     POWER_ZONE_NAMES,
@@ -21,7 +24,14 @@ ZONE_INPUT_CLASS = (
     'focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand'
 )
 
-ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+ALLOWED_IMAGE_TYPES = {
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+}
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
 MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
 
@@ -52,7 +62,7 @@ class ProfileSettingsForm(forms.ModelForm):
         widgets = {
             'photo': forms.FileInput(attrs={
                 'class': 'hidden',
-                'accept': 'image/jpeg,image/png,image/gif,image/webp',
+                'accept': '.jpg,.jpeg,image/jpeg,image/png,image/gif,image/webp',
                 'id': 'id_photo',
             }),
             'first_name': forms.TextInput(attrs={
@@ -106,6 +116,7 @@ class ProfileSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._photo_uploaded = False
         self.fields['photo'].required = False
         self.fields['first_name'].required = False
         self.fields['telegram'].required = False
@@ -155,10 +166,18 @@ class ProfileSettingsForm(forms.ModelForm):
         photo = self.cleaned_data.get('photo')
         if not photo:
             return self.instance.photo
-        if hasattr(photo, 'content_type') and photo.content_type not in ALLOWED_IMAGE_TYPES:
-            raise ValidationError('Поддерживаются JPEG, PNG, GIF и WebP')
+        content_type = getattr(photo, 'content_type', None)
+        if content_type and content_type not in ALLOWED_IMAGE_TYPES:
+            raise ValidationError('Поддерживаются JPEG (.jpg/.jpeg), PNG, GIF и WebP')
+        name = getattr(photo, 'name', '') or ''
+        ext = os.path.splitext(name)[1].lower()
+        if ext and ext not in ALLOWED_IMAGE_EXTENSIONS:
+            raise ValidationError('Поддерживаются JPEG (.jpg/.jpeg), PNG, GIF и WebP')
+        if not content_type and not ext:
+            raise ValidationError('Поддерживаются JPEG (.jpg/.jpeg), PNG, GIF и WebP')
         if photo.size > MAX_PHOTO_SIZE:
             raise ValidationError('Файл слишком большой (макс. 5 МБ)')
+        self._photo_uploaded = True
         return photo
 
     def clean_ftp(self):
@@ -234,8 +253,14 @@ class ProfileSettingsForm(forms.ModelForm):
         instance = super().save(commit=False)
         instance.power_zones = self.cleaned_data.get('power_zones') or []
         instance.hr_zones = self.cleaned_data.get('hr_zones') or []
+        photo_changed = getattr(self, '_photo_uploaded', False)
         if commit:
             instance.save()
+            if photo_changed:
+                if instance.photo:
+                    apply_photo_preview(instance)
+                else:
+                    clear_photo_preview(instance)
         return instance
 
 

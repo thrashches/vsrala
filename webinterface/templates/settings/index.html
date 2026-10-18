@@ -23,8 +23,8 @@
 
             <div class="flex items-center gap-4">
                 <div class="avatar h-20 w-20 text-xl" id="avatar-frame">
-                    {% if user.photo %}
-                        <img src="{{ user.photo.url }}" alt="" id="avatar-preview">
+                    {% if user.avatar_url %}
+                        <img src="{{ user.avatar_url }}" alt="" id="avatar-preview">
                     {% else %}
                         <span id="avatar-fallback">{{ user.email|make_list|first|upper }}</span>
                         <img src="" alt="" class="hidden" id="avatar-preview">
@@ -35,7 +35,7 @@
                         Сменить аватар
                     </label>
                     {{ profile_form.photo }}
-                    <p class="mt-1 text-xs text-ink-muted">JPEG, PNG, GIF или WebP, до 5 МБ</p>
+                    <p class="mt-1 text-xs text-ink-muted">JPEG (.jpg/.jpeg), PNG, GIF или WebP, до 5 МБ</p>
                     {% if profile_form.photo.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ profile_form.photo.errors|striptags }}</p>
                     {% endif %}

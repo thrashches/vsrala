@@ -31,12 +31,7 @@ def can_delete_comment(comment, user):
 
 def serialize_comment(comment, user):
     profile = comment.profile
-    photo_url = ''
-    if getattr(profile, 'photo', None):
-        try:
-            photo_url = profile.photo.url
-        except ValueError:
-            photo_url = ''
+    photo_url = getattr(profile, 'avatar_url', None) or ''
     return {
         'id': comment.pk,
         'text': comment.text,

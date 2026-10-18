@@ -130,7 +130,7 @@ def weekly_leaders(
             total_display = _format_duration(total_seconds)
             total_value = total_seconds
 
-        photo_url = profile.photo.url if profile.photo else None
+        photo_url = profile.avatar_url
         leaders.append({
             'rank': rank,
             'profile_id': profile.pk,

@@ -45,8 +45,8 @@
                             aria-label="Меню пользователя"
                             data-user-menu-toggle>
                         <span class="avatar h-10 w-10 text-sm ring-1 ring-gray-200">
-                            {% if user.photo %}
-                                <img src="{{ user.photo.url }}" alt="">
+                            {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" alt="">
                             {% else %}
                                 {{ user.email|make_list|first|upper }}
                             {% endif %}

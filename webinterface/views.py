@@ -508,9 +508,7 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
 
 
 def _profile_photo_url(profile):
-    if profile.photo:
-        return profile.photo.url
-    return None
+    return profile.avatar_url
 
 
 def _visible_activities_for(viewer, owner):
