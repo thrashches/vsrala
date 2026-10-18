@@ -258,6 +258,36 @@ class SurfaceEnrichmentTest(TestCase):
         self.assertEqual(self.route.surface_status, Route.SurfaceStatus.FAILED)
 
 
+class SurfaceReanalysisAdminActionTest(TestCase):
+    def setUp(self):
+        self.admin = Profile.objects.create_superuser(
+            email='admin-surface@example.com',
+            password='testpass123',
+        )
+        self.profile = _user('owner-surface@example.com')
+        self.client = Client()
+        self.client.login(email='admin-surface@example.com', password='testpass123')
+
+    @patch('routes.admin.enqueue_surface_enrichment')
+    def test_admin_action_enqueues_enrichment(self, enqueue):
+        pts = [[55.75, 37.60], [55.76, 37.61]]
+        r1 = Route.objects.create(
+            profile=self.profile, title='R1', track_points=pts, distance=1,
+        )
+        r2 = Route.objects.create(
+            profile=self.profile, title='R2', track_points=pts, distance=1,
+        )
+        url = reverse('admin:routes_route_changelist')
+        response = self.client.post(url, {
+            'action': 'enqueue_surface_reanalysis',
+            '_selected_action': [str(r1.pk), str(r2.pk)],
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(enqueue.call_count, 2)
+        enqueued = {call.args[0] for call in enqueue.call_args_list}
+        self.assertEqual(enqueued, {r1.pk, r2.pk})
+
+
 class RouteGpxDownloadTest(TestCase):
     def setUp(self):
         self.owner = _user('gpx-owner@example.com')
