@@ -9,6 +9,34 @@ from django.contrib.auth import get_user_model
 
 Profile = get_user_model()
 
+# Keep in sync with webinterface/static/js/track-map.js (also passed via data-surface-colors).
+SURFACE_COLORS = {
+    'asphalt': '#FC5200',
+    'concrete': '#ea580c',
+    'paving_stones': '#f59e0b',
+    'gravel': '#a16207',
+    'dirt': '#78716c',
+    'grass': '#16a34a',
+    'tartan': '#dc2626',
+    'unknown': '#9ca3af',
+}
+
+SURFACE_LABELS_RU = {
+    'asphalt': 'Асфальт',
+    'concrete': 'Бетон',
+    'paving_stones': 'Плитка',
+    'gravel': 'Гравий',
+    'dirt': 'Грунт',
+    'grass': 'Трава',
+    'tartan': 'Тартан',
+    'unknown': 'Неизвестно',
+}
+
+
+def surface_label_ru(surface: str) -> str:
+    key = (surface or 'unknown').strip() or 'unknown'
+    return SURFACE_LABELS_RU.get(key, key)
+
 
 class RouteQuerySet(models.QuerySet):
     def visible_to(self, user):
@@ -115,6 +143,10 @@ class Route(models.Model):
     def visibility_label(self) -> str:
         return self.get_visibility_display()
 
+    @property
+    def surface_colors_json(self) -> str:
+        return json.dumps(SURFACE_COLORS)
+
     def surface_summary(self) -> list[dict]:
         """Aggregate distance_m by surface for UI bars."""
         totals: dict[str, float] = {}
@@ -126,8 +158,10 @@ class Route(models.Model):
         return [
             {
                 'surface': name,
+                'label': surface_label_ru(name),
                 'distance_m': round(dist, 1),
                 'pct': round(100.0 * dist / total, 1),
+                'color': SURFACE_COLORS.get(name, SURFACE_COLORS['unknown']),
             }
             for name, dist in order
         ]

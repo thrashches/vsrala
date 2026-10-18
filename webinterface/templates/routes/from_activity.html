@@ -96,6 +96,9 @@
 
   var latlngs = points.map(function (p) { return [p[0], p[1]]; });
   var map = L.map('trim-map', { attributionControl: true });
+  if (map.attributionControl) {
+    map.attributionControl.setPrefix(false);
+  }
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     referrerPolicy: 'strict-origin-when-cross-origin',

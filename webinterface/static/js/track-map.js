@@ -94,6 +94,10 @@
       return [p.lat, p.lon];
     });
 
+    // Establish view before vector layers — Leaflet SVG renderer needs
+    // pixel bounds or polyline onAdd throws in _clipPoints.
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [16, 16] });
+
     var SURFACE_COLORS = {
       asphalt: '#FC5200',
       concrete: '#ea580c',
@@ -101,8 +105,22 @@
       gravel: '#a16207',
       dirt: '#78716c',
       grass: '#16a34a',
+      tartan: '#dc2626',
       unknown: '#9ca3af',
     };
+    var rawColors = el.getAttribute('data-surface-colors');
+    if (rawColors) {
+      try {
+        var parsedColors = JSON.parse(rawColors);
+        if (parsedColors && typeof parsedColors === 'object') {
+          Object.keys(parsedColors).forEach(function (key) {
+            SURFACE_COLORS[key] = parsedColors[key];
+          });
+        }
+      } catch (e) {
+        // keep defaults
+      }
+    }
 
     var segments = null;
     var rawSeg = el.getAttribute('data-segments');
@@ -114,9 +132,8 @@
       }
     }
 
-    var boundsLayer;
+    var lineWeight = interactive ? 4 : 3;
     if (segments && segments.length) {
-      var group = L.featureGroup();
       segments.forEach(function (seg) {
         var start = Math.max(0, Number(seg.start_idx) || 0);
         var end = Math.min(latlngs.length - 1, Number(seg.end_idx) || 0);
@@ -126,16 +143,14 @@
         var color = SURFACE_COLORS[seg.surface] || SURFACE_COLORS.unknown;
         L.polyline(slice, {
           color: color,
-          weight: interactive ? 4 : 3,
+          weight: lineWeight,
           opacity: 0.95,
-        }).addTo(group);
+        }).addTo(map);
       });
-      group.addTo(map);
-      boundsLayer = group;
     } else {
-      boundsLayer = L.polyline(latlngs, {
+      L.polyline(latlngs, {
         color: '#FC5200',
-        weight: interactive ? 4 : 3,
+        weight: lineWeight,
         opacity: 0.95,
       }).addTo(map);
     }
@@ -162,8 +177,6 @@
         interactive: false,
       }).addTo(map);
     }
-
-    map.fitBounds(boundsLayer.getBounds(), { padding: [16, 16] });
 
     setTimeout(function () {
       map.invalidateSize();

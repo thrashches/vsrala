@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static l10n %}
 {% block title %}{{ route.title|default:"Маршрут" }}{% endblock title %}
 
 {% block extra_head %}
@@ -70,6 +70,7 @@
                 <div data-track-map data-interactive="true"
                      data-points="{{ route.track_points_json|escape }}"
                      data-segments="{{ route.surface_segments_json|escape }}"
+                     data-surface-colors="{{ route.surface_colors_json|escape }}"
                      class="h-[420px] w-full bg-gray-100"></div>
             </div>
         {% endif %}
@@ -81,11 +82,15 @@
                     {% for row in surface_summary %}
                         <div>
                             <div class="mb-0.5 flex justify-between text-xs">
-                                <span class="font-medium text-ink">{{ row.surface }}</span>
+                                <span class="inline-flex items-center gap-2 font-medium text-ink">
+                                    <span style="display:inline-block;width:10px;height:10px;border-radius:9999px;background:{{ row.color }}"></span>
+                                    {{ row.label }}
+                                </span>
                                 <span class="text-ink-muted">{{ row.pct }}% · {{ row.distance_m }} м</span>
                             </div>
                             <div class="h-2 overflow-hidden rounded bg-gray-100">
-                                <div class="h-full rounded bg-brand" style="width: {{ row.pct }}%"></div>
+                                <div class="h-full rounded"
+                                     style="width: {{ row.pct|unlocalize }}%; background-color: {{ row.color }}"></div>
                             </div>
                         </div>
                     {% endfor %}
