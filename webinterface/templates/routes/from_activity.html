@@ -18,7 +18,17 @@
         </div>
 
         <div class="relative z-0 overflow-hidden">
-            <div id="trim-map" class="h-[360px] w-full bg-gray-100"></div>
+            <div id="trim-map" class="h-[420px] w-full bg-gray-100"></div>
+        </div>
+        <div class="flex gap-4 border-b border-gray-100 px-5 py-2 text-xs text-ink-muted">
+            <span class="inline-flex items-center gap-2">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:9999px;background:#22c55e;box-shadow:0 0 0 1px #fff"></span>
+                Начало
+            </span>
+            <span class="inline-flex items-center gap-2">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:9999px;background:#1c1c1e;box-shadow:0 0 0 1px #fff"></span>
+                Конец
+            </span>
         </div>
 
         <form method="post" class="space-y-5 px-5 py-5" id="trim-form">
@@ -94,7 +104,26 @@
 
   var fullLine = L.polyline(latlngs, { color: '#d1d5db', weight: 3, opacity: 0.8 }).addTo(map);
   var selLine = L.polyline(latlngs, { color: '#FC5200', weight: 4, opacity: 0.95 }).addTo(map);
+  var startMarker = L.circleMarker(latlngs[0], {
+    radius: 7,
+    color: '#fff',
+    weight: 2,
+    fillColor: '#22c55e',
+    fillOpacity: 1,
+    opacity: 1,
+    interactive: false,
+  }).addTo(map);
+  var endMarker = L.circleMarker(latlngs[latlngs.length - 1], {
+    radius: 7,
+    color: '#fff',
+    weight: 2,
+    fillColor: '#1c1c1e',
+    fillOpacity: 1,
+    opacity: 1,
+    interactive: false,
+  }).addTo(map);
   map.fitBounds(fullLine.getBounds(), { padding: [16, 16] });
+  setTimeout(function () { map.invalidateSize(); }, 100);
 
   var startInput = document.getElementById('id_start_idx');
   var endInput = document.getElementById('id_end_idx');
@@ -118,6 +147,8 @@
     endLabel.textContent = e;
     countEl.textContent = e - s + 1;
     selLine.setLatLngs(latlngs.slice(s, e + 1));
+    startMarker.setLatLng(latlngs[s]);
+    endMarker.setLatLng(latlngs[e]);
   }
 
   startRange.addEventListener('input', sync);
