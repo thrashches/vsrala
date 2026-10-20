@@ -1,0 +1,61 @@
+<div class="rounded border border-gray-200 bg-feed px-4 py-3 space-y-3" id="track-fields">
+    <label class="flex cursor-pointer items-start gap-3">
+        {{ form.is_track }}
+        <span>
+            <span class="block text-sm font-semibold text-ink">Тренировка на треке</span>
+            <span class="mt-0.5 block text-xs text-ink-muted">
+                Пометка для заездов на велотреке. Длина круга нужна для анализа.
+            </span>
+        </span>
+    </label>
+    {% if form.is_track.errors %}
+        <p class="text-sm text-red-600">{{ form.is_track.errors|striptags }}</p>
+    {% endif %}
+    <div id="track-lap-wrap" class="{% if not form.is_track.value %}hidden{% endif %}">
+        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted"
+               for="{{ form.track_lap_length_m.id_for_label }}">Длина круга</label>
+        {{ form.track_lap_length_m }}
+        {% if form.track_lap_length_m.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.track_lap_length_m.errors|striptags }}</p>
+        {% endif %}
+    </div>
+</div>
+<script>
+(function () {
+  var checkbox = document.getElementById('id_is_track');
+  var wrap = document.getElementById('track-lap-wrap');
+  var typeSelect = document.getElementById('id_activity_type');
+  var lapSelect = document.getElementById('id_track_lap_length_m');
+  var trackTypeId = {{ form.track_cycling_type_id|default:'null' }};
+  var defaultLap = '{{ form.default_track_lap_length|default:"" }}';
+  if (!checkbox || !wrap) return;
+
+  function syncWrap() {
+    wrap.classList.toggle('hidden', !checkbox.checked);
+  }
+
+  function ensureLapDefault() {
+    if (!lapSelect || !defaultLap) return;
+    if (!lapSelect.value) {
+      lapSelect.value = defaultLap;
+    }
+  }
+
+  checkbox.addEventListener('change', function () {
+    if (checkbox.checked) ensureLapDefault();
+    syncWrap();
+  });
+
+  if (typeSelect && trackTypeId !== null) {
+    typeSelect.addEventListener('change', function () {
+      if (String(typeSelect.value) === String(trackTypeId)) {
+        checkbox.checked = true;
+        ensureLapDefault();
+        syncWrap();
+      }
+    });
+  }
+
+  syncWrap();
+})();
+</script>

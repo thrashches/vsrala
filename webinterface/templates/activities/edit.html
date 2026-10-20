@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Редактировать тренировку{% endblock title %}
+
+{% block content %}
+<div class="mx-auto max-w-lg px-4 py-10">
+    <div class="rounded bg-white p-6 shadow-card">
+        <h1 class="text-xl font-bold text-ink">Редактировать тренировку</h1>
+        <p class="mt-1 text-sm text-ink-muted">Название, тип и пометка «на треке». Файл тренировки не меняется.</p>
+
+        <form method="post" class="mt-6 space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Название</label>
+                {{ form.title }}
+                {% if form.title.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.title.errors|striptags }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Описание</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.description.errors|striptags }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted">Тип</label>
+                {{ form.activity_type }}
+                {% if form.activity_type.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.activity_type.errors|striptags }}</p>
+                {% endif %}
+            </div>
+
+            {% include 'includes/track_fields.html' with form=form %}
+
+            <div class="flex gap-3">
+                <button type="submit" class="btn-brand flex-1">Сохранить</button>
+                <a href="{% url 'webinterface:activity_detail' activity.pk %}"
+                   class="inline-flex flex-1 items-center justify-center rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-ink hover:bg-gray-50">
+                    Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}

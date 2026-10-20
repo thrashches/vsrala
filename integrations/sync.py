@@ -11,6 +11,7 @@ from django.utils import timezone as dj_timezone
 
 from activities.models import Activity, ActivityType
 from activities.parsers import TrackParseError, parse_track
+from activities.track import is_track_cycling_type
 
 from .intervals_client import IntervalsApiError, IntervalsClient
 from .models import IntervalsConnection
@@ -170,6 +171,10 @@ def import_remote_activity(
     )
     activity.apply_parsed_track(parsed)
     activity.track_file = ContentFile(file_bytes, name=filename)
+    if is_track_cycling_type(activity_type):
+        activity.is_track = True
+        if connection.profile.default_track_lap_length_m is not None:
+            activity.track_lap_length_m = connection.profile.default_track_lap_length_m
 
     try:
         activity.save()

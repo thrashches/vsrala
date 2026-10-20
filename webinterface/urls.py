@@ -7,6 +7,7 @@ from .views import (
     ActivityDetailView,
     ActivityReactView,
     MyActivitiesView,
+    ActivityEditView,
     ActivityUploadView,
     ProfileSettingsView,
     PeopleSearchView,
@@ -35,6 +36,7 @@ urlpatterns = [
     path('activities/upload/', ActivityUploadView.as_view(), name='activity_upload'),
     path('activities/my/', MyActivitiesView.as_view(), name='my_activities'),
     path('activities/<int:pk>/', ActivityDetailView.as_view(), name='activity_detail'),
+    path('activities/<int:pk>/edit/', ActivityEditView.as_view(), name='activity_edit'),
     path('activities/<int:pk>/react/', ActivityReactView.as_view(), name='activity_react'),
     path('activities/<int:pk>/comments/', ActivityCommentCreateView.as_view(), name='activity_comment_create'),
     path(

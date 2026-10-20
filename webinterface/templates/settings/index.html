@@ -197,6 +197,29 @@
                 </div>
             </div>
 
+            <div class="rounded border border-gray-200 bg-feed px-4 py-3 space-y-3" id="track-settings">
+                <label class="flex cursor-pointer items-start gap-3">
+                    {{ profile_form.trains_on_track }}
+                    <span>
+                        <span class="block text-sm font-semibold text-ink">Тренируюсь на треке</span>
+                        <span class="mt-0.5 block text-xs text-ink-muted">
+                            Длина круга подставится при загрузке тренировки на треке.
+                        </span>
+                    </span>
+                </label>
+                {% if profile_form.trains_on_track.errors %}
+                    <p class="text-sm text-red-600">{{ profile_form.trains_on_track.errors|striptags }}</p>
+                {% endif %}
+                <div id="default-track-lap-wrap" class="{% if not profile_form.trains_on_track.value %}hidden{% endif %}">
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted"
+                           for="{{ profile_form.default_track_lap_length_m.id_for_label }}">Длина круга по умолчанию</label>
+                    {{ profile_form.default_track_lap_length_m }}
+                    {% if profile_form.default_track_lap_length_m.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ profile_form.default_track_lap_length_m.errors|striptags }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <div class="rounded border border-gray-200 bg-feed px-4 py-3">
                 <label class="flex cursor-pointer items-start gap-3">
                     {{ profile_form.is_public }}
@@ -373,6 +396,16 @@
     preview.classList.remove('hidden');
     if (fallback) fallback.classList.add('hidden');
   });
+})();
+(function () {
+  var checkbox = document.getElementById('id_trains_on_track');
+  var wrap = document.getElementById('default-track-lap-wrap');
+  if (!checkbox || !wrap) return;
+  function sync() {
+    wrap.classList.toggle('hidden', !checkbox.checked);
+  }
+  checkbox.addEventListener('change', sync);
+  sync();
 })();
 </script>
 {% endblock content %}

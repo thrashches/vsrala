@@ -25,17 +25,29 @@
                         {% if activity.is_indoor %}
                             · <span class="font-semibold text-ink">Indoor</span>
                         {% endif %}
+                        {% if activity.is_track %}
+                            · <span class="font-semibold text-ink">На треке</span>{% if activity.track_lap_length_display %} · {{ activity.track_lap_length_display }}{% endif %}
+                        {% endif %}
                     </div>
                     <h1 class="mt-2 text-2xl font-bold text-ink">{{ activity.title }}</h1>
                     {% if activity.description %}
                         <p class="mt-2 text-sm text-ink-muted">{{ activity.description }}</p>
                     {% endif %}
-                    {% if is_owner and activity.track_points %}
-                        <a href="{% url 'webinterface:route_from_activity' activity.pk %}"
-                           class="mt-3 inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-gray-50">
-                            <span class="material-icons text-[18px] leading-none" aria-hidden="true">route</span>
-                            Сохранить как маршрут
-                        </a>
+                    {% if is_owner %}
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <a href="{% url 'webinterface:activity_edit' activity.pk %}"
+                               class="inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-gray-50">
+                                <span class="material-icons text-[18px] leading-none" aria-hidden="true">edit</span>
+                                Редактировать
+                            </a>
+                            {% if activity.track_points %}
+                                <a href="{% url 'webinterface:route_from_activity' activity.pk %}"
+                                   class="inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-gray-50">
+                                    <span class="material-icons text-[18px] leading-none" aria-hidden="true">route</span>
+                                    Сохранить как маршрут
+                                </a>
+                            {% endif %}
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -103,24 +115,43 @@
             </div>
         {% endif %}
 
-        {% if activity.streams.speed or activity.streams.hr or activity.streams.power or activity.streams.ele %}
+        {% if activity.streams.speed or activity.streams.hr or activity.streams.power or activity.streams.cadence or activity.streams.ele %}
         <div id="activity-streams"
              data-streams="{{ activity.streams_json|escape }}"
              data-duration="{{ activity.duration.total_seconds|floatformat:0 }}"
+             data-track-timeline="{{ track_timeline_json|default:'[]'|escape }}"
              class="space-y-4 border-t border-gray-100 px-5 py-5">
-            <div data-chart-panel>
+            {% if track_analysis and track_analysis.available and track_analysis.timeline %}
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                <span class="font-semibold text-ink">Линии на графиках:</span>
+                {% for row in track_analysis.line_rows %}
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="inline-block h-2.5 w-2.5 rounded-sm border border-gray-300"
+                              style="background-color: {{ row.color }};"></span>
+                        {{ row.label }}
+                    </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div data-chart-panel data-track-bands="1">
                 <h3 class="mb-2 text-sm font-semibold text-ink">Скорость</h3>
                 <div class="h-36">
                     <canvas id="chart-speed"></canvas>
                 </div>
             </div>
-            <div data-chart-panel>
+            <div data-chart-panel data-track-bands="1">
+                <h3 class="mb-2 text-sm font-semibold text-ink">Каденс</h3>
+                <div class="h-36">
+                    <canvas id="chart-cadence"></canvas>
+                </div>
+            </div>
+            <div data-chart-panel data-track-bands="1">
                 <h3 class="mb-2 text-sm font-semibold text-ink">Пульс</h3>
                 <div class="h-36">
                     <canvas id="chart-hr"></canvas>
                 </div>
             </div>
-            <div data-chart-panel>
+            <div data-chart-panel data-track-bands="1">
                 <h3 class="mb-2 text-sm font-semibold text-ink">Мощность</h3>
                 <div class="h-36">
                     <canvas id="chart-power"></canvas>
@@ -153,6 +184,12 @@
                         class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
                     Лучшее время
                 </button>
+                {% if activity.is_track %}
+                <button type="button" role="tab" data-tab="track" aria-selected="false"
+                        class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
+                    Анализ
+                </button>
+                {% endif %}
             </div>
 
             <div data-tab-panel="stats" class="px-5 py-5">
@@ -330,6 +367,12 @@
             <div data-tab-panel="best" class="hidden px-5 py-5">
                 {% include 'activities/includes/best_efforts.html' %}
             </div>
+
+            {% if activity.is_track %}
+            <div data-tab-panel="track" class="hidden px-5 py-5">
+                {% include 'activities/includes/track_analysis.html' %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="relative z-10 border-t border-gray-100 px-5 py-4">

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -6,6 +7,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from activities.models import Activity, ActivityType
+from activities.track import format_track_lap_length
 from profiles.models import Follow, Profile
 
 FIXTURES = Path(__file__).parent.parent.parent / 'activities' / 'tests' / 'fixtures'
@@ -72,6 +74,28 @@ class ActivityModelTest(TestCase):
         self.assertEqual(float(activity.tss), 100.0)
         self.assertEqual(activity.normalized_power, 250)
 
+    def test_track_lap_length_display(self):
+        self.assertEqual(format_track_lap_length(Decimal('250')), '250 м')
+        self.assertEqual(format_track_lap_length(Decimal('333.33')), '333,33 м')
+        activity = Activity(
+            profile=self.profile,
+            started_at=datetime.now(),
+            is_track=True,
+            track_lap_length_m=Decimal('250'),
+        )
+        self.assertEqual(activity.track_lap_length_display, '250 м')
+
+    def test_save_clears_lap_length_when_not_track(self):
+        activity = Activity.objects.create(
+            profile=self.profile,
+            started_at=datetime.now(),
+            is_track=False,
+            track_lap_length_m=Decimal('250'),
+            distance=1,
+            duration=timedelta(minutes=10),
+        )
+        activity.refresh_from_db()
+        self.assertIsNone(activity.track_lap_length_m)
 
 
 class ActivityUploadViewTest(TestCase):
@@ -79,6 +103,8 @@ class ActivityUploadViewTest(TestCase):
         self.client = Client()
         self.user = Profile.objects.create_user(email='rider@example.com', password='testpass123')
         self.client.login(email='rider@example.com', password='testpass123')
+        self.track_type = ActivityType.objects.create(name='Трековый велосипед')
+        self.road_type = ActivityType.objects.create(name='Шоссейный велосипед')
 
     def test_upload_gpx(self):
         content = (FIXTURES / 'sample.gpx').read_bytes()
@@ -102,6 +128,99 @@ class ActivityUploadViewTest(TestCase):
         })
         self.assertEqual(Activity.objects.count(), 0)
         self.assertEqual(response.status_code, 200)
+
+    def test_upload_track_type_sets_is_track_with_default_length(self):
+        self.user.trains_on_track = True
+        self.user.default_track_lap_length_m = Decimal('250')
+        self.user.save()
+        content = (FIXTURES / 'sample.gpx').read_bytes()
+        upload = SimpleUploadedFile('sample.gpx', content, content_type='application/gpx+xml')
+        response = self.client.post(reverse('webinterface:activity_upload'), {
+            'track_file': upload,
+            'title': 'Трек',
+            'activity_type': self.track_type.pk,
+            'track_lap_length_m': '250',
+        })
+        self.assertEqual(response.status_code, 302)
+        activity = Activity.objects.get()
+        self.assertTrue(activity.is_track)
+        self.assertEqual(float(activity.track_lap_length_m), 250.0)
+
+    def test_upload_track_length_override(self):
+        self.user.trains_on_track = True
+        self.user.default_track_lap_length_m = Decimal('250')
+        self.user.save()
+        content = (FIXTURES / 'sample.gpx').read_bytes()
+        upload = SimpleUploadedFile('sample.gpx', content, content_type='application/gpx+xml')
+        response = self.client.post(reverse('webinterface:activity_upload'), {
+            'track_file': upload,
+            'is_track': 'on',
+            'track_lap_length_m': '400',
+        })
+        self.assertEqual(response.status_code, 302)
+        activity = Activity.objects.get()
+        self.assertTrue(activity.is_track)
+        self.assertEqual(float(activity.track_lap_length_m), 400.0)
+
+    def test_upload_track_requires_lap_length(self):
+        content = (FIXTURES / 'sample.gpx').read_bytes()
+        upload = SimpleUploadedFile('sample.gpx', content, content_type='application/gpx+xml')
+        response = self.client.post(reverse('webinterface:activity_upload'), {
+            'track_file': upload,
+            'activity_type': self.track_type.pk,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Activity.objects.count(), 0)
+
+
+class ActivityEditViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = Profile.objects.create_user(email='rider@example.com', password='testpass123')
+        self.other = Profile.objects.create_user(email='other@example.com', password='testpass123')
+        self.client.login(email='rider@example.com', password='testpass123')
+        self.activity = Activity.objects.create(
+            profile=self.user,
+            title='Заезд',
+            distance=10,
+            started_at=datetime.now(),
+            duration=timedelta(minutes=30),
+            is_track=True,
+            track_lap_length_m=Decimal('250'),
+        )
+
+    def test_owner_can_edit(self):
+        url = reverse('webinterface:activity_edit', kwargs={'pk': self.activity.pk})
+        response = self.client.post(url, {
+            'title': 'Обновлено',
+            'description': '',
+            'is_track': 'on',
+            'track_lap_length_m': '333.33',
+        })
+        self.assertRedirects(
+            response,
+            reverse('webinterface:activity_detail', kwargs={'pk': self.activity.pk}),
+        )
+        self.activity.refresh_from_db()
+        self.assertEqual(self.activity.title, 'Обновлено')
+        self.assertEqual(float(self.activity.track_lap_length_m), 333.33)
+
+    def test_clear_track_flag_clears_length(self):
+        url = reverse('webinterface:activity_edit', kwargs={'pk': self.activity.pk})
+        response = self.client.post(url, {
+            'title': 'Заезд',
+            'description': '',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.activity.refresh_from_db()
+        self.assertFalse(self.activity.is_track)
+        self.assertIsNone(self.activity.track_lap_length_m)
+
+    def test_non_owner_gets_404(self):
+        self.client.login(email='other@example.com', password='testpass123')
+        url = reverse('webinterface:activity_edit', kwargs={'pk': self.activity.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class FeedViewTest(TestCase):

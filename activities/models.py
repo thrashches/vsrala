@@ -1,8 +1,11 @@
 import json
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth import get_user_model
 from datetime import timedelta, time
+
+from activities.track import TRACK_LAP_LENGTH_CHOICES, format_track_lap_length
 
 Profile = get_user_model()
 
@@ -72,6 +75,15 @@ class Activity(models.Model):
     track_points = models.JSONField(blank=True, null=True, default=list, verbose_name='точки трека')
     streams = models.JSONField(blank=True, null=True, default=dict, verbose_name='потоки данных')
     is_indoor = models.BooleanField(default=False, verbose_name='indoor')
+    is_track = models.BooleanField(default=False, verbose_name='тренировка на треке')
+    track_lap_length_m = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        choices=TRACK_LAP_LENGTH_CHOICES,
+        verbose_name='длина круга трека',
+    )
     zone_timeline = models.ImageField(
         blank=True, null=True, upload_to='activity_timelines',
         verbose_name='таймлайн зон',
@@ -155,7 +167,23 @@ class Activity(models.Model):
     def duration_active_display(self):
         return self._format_hms(self.duration_active)
 
+    @property
+    def track_lap_length_display(self):
+        return format_track_lap_length(self.track_lap_length_m)
+
+    def clean(self):
+        super().clean()
+        if self.is_track:
+            if self.track_lap_length_m is None:
+                raise ValidationError({
+                    'track_lap_length_m': 'Укажите длину круга для тренировки на треке',
+                })
+        else:
+            self.track_lap_length_m = None
+
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.is_track:
+            self.track_lap_length_m = None
         if (self.title == '' or self.title is None) and self.started_at:
             t = self.started_at.time()
             if time(hour=5) <= t <= time(hour=12):

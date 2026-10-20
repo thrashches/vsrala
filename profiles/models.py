@@ -3,6 +3,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
 
+from activities.track import TRACK_LAP_LENGTH_CHOICES
+
 
 class UserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -58,6 +60,15 @@ class Profile(AbstractUser):
     )
     hr_zones = models.JSONField(blank=True, null=True, default=list, verbose_name='зоны пульса')
     power_zones = models.JSONField(blank=True, null=True, default=list, verbose_name='зоны мощности')
+    trains_on_track = models.BooleanField(default=False, verbose_name='тренируюсь на треке')
+    default_track_lap_length_m = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        choices=TRACK_LAP_LENGTH_CHOICES,
+        verbose_name='длина круга трека по умолчанию',
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -85,6 +96,21 @@ class Profile(AbstractUser):
             except ValueError:
                 pass
         return None
+
+    def clean(self):
+        super().clean()
+        if self.trains_on_track:
+            if self.default_track_lap_length_m is None:
+                raise ValidationError({
+                    'default_track_lap_length_m': 'Укажите длину круга трека',
+                })
+        else:
+            self.default_track_lap_length_m = None
+
+    def save(self, *args, **kwargs):
+        if not self.trains_on_track:
+            self.default_track_lap_length_m = None
+        return super().save(*args, **kwargs)
 
 
 class Follow(models.Model):

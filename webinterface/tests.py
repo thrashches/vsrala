@@ -61,6 +61,57 @@ class ProfileSettingsViewTest(TestCase):
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_public)
 
+    def test_save_track_training_settings(self):
+        response = self.client.post(self.url, {
+            'action': 'profile',
+            'first_name': '',
+            'email': 'me@example.com',
+            'telegram': '',
+            'instagram': '',
+            'vk': '',
+            'is_public': 'on',
+            'trains_on_track': 'on',
+            'default_track_lap_length_m': '250',
+        })
+        self.assertRedirects(response, self.url)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.trains_on_track)
+        self.assertEqual(float(self.user.default_track_lap_length_m), 250.0)
+
+    def test_track_settings_require_lap_length(self):
+        response = self.client.post(self.url, {
+            'action': 'profile',
+            'first_name': '',
+            'email': 'me@example.com',
+            'telegram': '',
+            'instagram': '',
+            'vk': '',
+            'is_public': 'on',
+            'trains_on_track': 'on',
+            'default_track_lap_length_m': '',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.trains_on_track)
+
+    def test_clear_track_settings(self):
+        self.user.trains_on_track = True
+        self.user.default_track_lap_length_m = '400'
+        self.user.save()
+        response = self.client.post(self.url, {
+            'action': 'profile',
+            'first_name': '',
+            'email': 'me@example.com',
+            'telegram': '',
+            'instagram': '',
+            'vk': '',
+            'is_public': 'on',
+        })
+        self.assertRedirects(response, self.url)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.trains_on_track)
+        self.assertIsNone(self.user.default_track_lap_length_m)
+
     def test_duplicate_email_rejected(self):
         Profile.objects.create_user(email='taken@example.com', password='testpass123')
         response = self.client.post(self.url, {
@@ -480,3 +531,60 @@ class WeeklyLeadersApiTest(TestCase):
         self.client.login(email='me@example.com', password='testpass123')
         response = self.client.get(self.url, {'metric': 'power'})
         self.assertEqual(response.status_code, 400)
+
+
+class TrackAnalysisDetailTabTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = Profile.objects.create_user(email='track@example.com', password='testpass123')
+        self.client.login(email='track@example.com', password='testpass123')
+        # Minimal steady corridor stream (~8 laps of 250 m at 40 km/h).
+        times, speeds, distances = [], [], []
+        t = dist = 0.0
+        v = 40.0
+        dt = 1.0
+        for _ in range(200):
+            times.append(t)
+            speeds.append(v)
+            distances.append(dist)
+            t += dt
+            dist += (v / 3.6) * dt
+        self.activity = Activity.objects.create(
+            profile=self.user,
+            title='Трековая',
+            distance=2.2,
+            started_at=timezone.now(),
+            is_track=True,
+            track_lap_length_m=Decimal('250'),
+            streams={'time': times, 'speed': speeds, 'distance': distances},
+        )
+
+    def test_analysis_tab_on_track_activity(self):
+        url = reverse('webinterface:activity_detail', kwargs={'pk': self.activity.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-tab="track"')
+        self.assertContains(response, 'Анализ')
+        self.assertIsNotNone(response.context['track_analysis'])
+        self.assertTrue(response.context['track_analysis']['available'])
+        self.assertContains(response, 'Спринтерский коридор')
+        self.assertContains(response, 'Блок смен недоступен')
+        self.assertContains(response, 'data-track-timeline')
+        self.assertContains(response, 'Линии на графиках')
+        self.assertIn('track_timeline_json', response.context)
+        self.assertIn('corridor', response.context['track_timeline_json'])
+
+    def test_no_analysis_tab_off_track(self):
+        road = Activity.objects.create(
+            profile=self.user,
+            title='Шоссе',
+            distance=40,
+            started_at=timezone.now(),
+            is_track=False,
+            streams={'time': [0, 10], 'speed': [30, 30]},
+        )
+        url = reverse('webinterface:activity_detail', kwargs={'pk': road.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-tab="track"')
+        self.assertIsNone(response.context['track_analysis'])

@@ -49,6 +49,7 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
     powers = []
     cadences = []
     speeds_raw = []
+    distances_raw = []
 
     try:
         records = list(fit.get_messages('record'))
@@ -83,6 +84,8 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
         powers.append(int(power) if power is not None else None)
         cadences.append(int(cad) if cad is not None else None)
         speeds_raw.append(spd * 3.6 if spd is not None else None)
+        # FIT distance is meters when present.
+        distances_raw.append(float(dist) if dist is not None else None)
 
     if not times and not any(p is not None for p in points):
         raise TrackParseError('FIT не содержит записей тренировки')
@@ -221,12 +224,17 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
     if session_max_cadence is not None:
         max_cadence = int(session_max_cadence)
 
+    distance_vals = [d for d in distances_raw if d is not None]
     streams = {
         'time': time_stream,
         'speed': speeds,
         'hr': hrs if hr_vals else [],
         'power': powers if power_vals else [],
         'cadence': cadences if avg_cadence is not None else [],
+        'distance': [
+            round(distances_raw[i], 2) if distances_raw[i] is not None else None
+            for i in range(n)
+        ] if distance_vals else [],
         'ele': [
             round(elevations[i], 1) if elevations[i] is not None else None
             for i in range(n)

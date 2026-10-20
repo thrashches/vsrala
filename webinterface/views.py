@@ -13,6 +13,7 @@ from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 
 from activities.best_efforts import build_best_efforts
+from activities.track_analysis import build_track_analysis
 from activities.comments import (
     COMMENT_TEXT_MAX_LENGTH,
     can_delete_comment,
@@ -22,7 +23,7 @@ from activities.comments import (
     serialize_comment,
     update_comment,
 )
-from activities.forms import ActivityUploadForm
+from activities.forms import ActivityEditForm, ActivityUploadForm
 from activities.leaderboard import VALID_METRICS, VALID_WEEKS, weekly_leaders
 from activities.models import Activity, ActivityComment, ActivityReaction, ActivityType
 from activities.parsers import TrackParseError, parse_track
@@ -248,6 +249,14 @@ class ActivityDetailView(LoginRequiredMixin, DetailView):
             else []
         )
         context['best_efforts'] = build_best_efforts(activity)
+        track_analysis = build_track_analysis(activity) if activity.is_track else None
+        context['track_analysis'] = track_analysis
+        timeline = (
+            track_analysis.get('timeline')
+            if track_analysis and track_analysis.get('available')
+            else []
+        )
+        context['track_timeline_json'] = json.dumps(timeline)
         return context
 
 
@@ -468,6 +477,11 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
     form_class = ActivityUploadForm
     template_name = 'activities/upload.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         from datetime import datetime, timezone
         from io import BytesIO
@@ -476,6 +490,8 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
 
         activity = form.save(commit=False)
         activity.profile = self.request.user
+        activity.is_track = form.cleaned_data.get('is_track', False)
+        activity.track_lap_length_m = form.cleaned_data.get('track_lap_length_m')
         track_file = form.cleaned_data['track_file']
         filename = track_file.name
 
@@ -495,6 +511,10 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
 
         activity.apply_parsed_track(parsed)
         activity.track_file = ContentFile(file_bytes, name=filename)
+        # Re-apply track flags: apply_parsed_track does not touch them, but
+        # keep explicit assignment after parse for clarity.
+        activity.is_track = form.cleaned_data.get('is_track', False)
+        activity.track_lap_length_m = form.cleaned_data.get('track_lap_length_m')
         activity.save()
         from activities.map_preview import apply_map_preview
         from activities.zone_timeline import apply_zone_timeline
@@ -506,6 +526,36 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('webinterface:activity_detail', kwargs={'pk': self.object.pk})
+
+
+class ActivityEditView(LoginRequiredMixin, View):
+    template_name = 'activities/edit.html'
+
+    def _get_owned(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        if activity.profile_id != request.user.pk:
+            raise Http404
+        return activity
+
+    def get(self, request, pk):
+        activity = self._get_owned(request, pk)
+        form = ActivityEditForm(instance=activity, user=request.user)
+        return render(request, self.template_name, {
+            'form': form,
+            'activity': activity,
+        })
+
+    def post(self, request, pk):
+        activity = self._get_owned(request, pk)
+        form = ActivityEditForm(request.POST, instance=activity, user=request.user)
+        if not form.is_valid():
+            return render(request, self.template_name, {
+                'form': form,
+                'activity': activity,
+            })
+        form.save()
+        messages.success(request, 'Тренировка обновлена')
+        return redirect('webinterface:activity_detail', pk=activity.pk)
 
 
 def _profile_photo_url(profile):

@@ -57,7 +57,8 @@ class ProfileSettingsForm(forms.ModelForm):
         model = Profile
         fields = [
             'photo', 'first_name', 'email', 'telegram', 'instagram', 'vk',
-            'ftp', 'max_heart_rate', 'is_public',
+            'ftp', 'max_heart_rate', 'trains_on_track', 'default_track_lap_length_m',
+            'is_public',
         ]
         widgets = {
             'photo': forms.FileInput(attrs={
@@ -98,6 +99,14 @@ class ProfileSettingsForm(forms.ModelForm):
                 'min': 100,
                 'max': 250,
             }),
+            'trains_on_track': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand',
+                'id': 'id_trains_on_track',
+            }),
+            'default_track_lap_length_m': forms.Select(attrs={
+                'class': INPUT_CLASS,
+                'id': 'id_default_track_lap_length_m',
+            }),
             'is_public': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand',
             }),
@@ -111,6 +120,8 @@ class ProfileSettingsForm(forms.ModelForm):
             'vk': 'VK',
             'ftp': 'FTP (Вт)',
             'max_heart_rate': 'Макс. пульс (уд/мин)',
+            'trains_on_track': 'Тренируюсь на треке',
+            'default_track_lap_length_m': 'Длина круга по умолчанию',
             'is_public': 'Открытый профиль',
         }
 
@@ -124,6 +135,13 @@ class ProfileSettingsForm(forms.ModelForm):
         self.fields['vk'].required = False
         self.fields['ftp'].required = False
         self.fields['max_heart_rate'].required = False
+        self.fields['trains_on_track'].required = False
+        self.fields['default_track_lap_length_m'].required = False
+        lap_field = self.fields['default_track_lap_length_m']
+        lap_choices = [
+            (value, label) for value, label in lap_field.choices if value != ''
+        ]
+        lap_field.choices = [('', 'Выберите длину круга')] + lap_choices
         self.power_zones_for_display = self._zones_for_display('power')
         self.hr_zones_for_display = self._zones_for_display('hr')
         self.zone_input_class = ZONE_INPUT_CLASS
@@ -247,12 +265,24 @@ class ProfileSettingsForm(forms.ModelForm):
         if 'hr_zones' in cleaned and cleaned['hr_zones']:
             self.hr_zones_for_display = cleaned['hr_zones']
 
+        trains_on_track = cleaned.get('trains_on_track')
+        lap_length = cleaned.get('default_track_lap_length_m')
+        if trains_on_track and lap_length is None:
+            self.add_error(
+                'default_track_lap_length_m',
+                'Укажите длину круга трека',
+            )
+        if not trains_on_track:
+            cleaned['default_track_lap_length_m'] = None
+
         return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.power_zones = self.cleaned_data.get('power_zones') or []
         instance.hr_zones = self.cleaned_data.get('hr_zones') or []
+        if not instance.trains_on_track:
+            instance.default_track_lap_length_m = None
         photo_changed = getattr(self, '_photo_uploaded', False)
         if commit:
             instance.save()

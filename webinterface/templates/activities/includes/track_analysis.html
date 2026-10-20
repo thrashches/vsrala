@@ -1,0 +1,184 @@
+{% if not track_analysis or not track_analysis.available %}
+    <p class="py-4 text-sm text-ink-muted">
+        {% if track_analysis.reason == 'no_speed' %}
+            Недостаточно данных о скорости для анализа трека.
+        {% elif track_analysis.reason == 'no_lap_length' %}
+            Укажите длину круга трека, чтобы построить анализ.
+        {% elif track_analysis.reason == 'no_laps' %}
+            Не удалось выделить круги на треке. Проверьте длину круга и качество записи.
+        {% else %}
+            Анализ трека недоступен.
+        {% endif %}
+    </p>
+{% else %}
+<div class="space-y-8">
+    <div>
+        <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h3 class="text-sm font-bold text-ink sm:text-base">Движение по линиям</h3>
+            <p class="text-xs text-ink-muted">Всего кругов: {{ track_analysis.total_laps }}</p>
+        </div>
+
+        {# Stadium oval: two equal straights + concentric semicircle turns #}
+        {# cx=200 cy=110, straight x=100..300; wood ×1.5: board=100 → corridor 58 (width 42) #}
+        {# corridor 58→50, azure 50→42, stayer=79 #}
+        <div class="mb-4 overflow-hidden rounded border border-gray-200 bg-white px-3 py-4 sm:px-5"
+             data-track-line-diagram>
+            <div class="relative mx-auto max-w-lg">
+                <svg viewBox="0 0 400 220" class="h-auto w-full" role="img"
+                     aria-label="Схема линий велотрека">
+                    <defs>
+                        <linearGradient id="track-wood" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#d7b07a"/>
+                            <stop offset="50%" stop-color="#c9a066"/>
+                            <stop offset="100%" stop-color="#b89050"/>
+                        </linearGradient>
+                    </defs>
+
+                    {# Wood deck ×1.5: board (R=100) → corridor outer (R=58) #}
+                    <path fill="url(#track-wood)" fill-rule="evenodd"
+                          d="M 100 10 H 300 A 100 100 0 0 1 300 210 H 100 A 100 100 0 0 1 100 10 Z
+                             M 100 52 H 300 A 58 58 0 0 1 300 168 H 100 A 58 58 0 0 1 100 52 Z"/>
+
+                    {# Corridor band: R=58 → R=50 #}
+                    <path fill="#dc2626" fill-rule="evenodd"
+                          opacity="{% if track_analysis.line_counts.corridor %}0.92{% else %}0.35{% endif %}"
+                          d="M 100 52 H 300 A 58 58 0 0 1 300 168 H 100 A 58 58 0 0 1 100 52 Z
+                             M 100 60 H 300 A 50 50 0 0 1 300 160 H 100 A 50 50 0 0 1 100 60 Z"/>
+
+                    {# Лазурка: R=50 → R=42 #}
+                    <path fill="#38bdf8" fill-rule="evenodd"
+                          opacity="{% if track_analysis.line_counts.slow %}0.9{% else %}0.35{% endif %}"
+                          d="M 100 60 H 300 A 50 50 0 0 1 300 160 H 100 A 50 50 0 0 1 100 60 Z
+                             M 100 68 H 300 A 42 42 0 0 1 300 152 H 100 A 42 42 0 0 1 100 68 Z"/>
+
+                    {# Board — white with soft outline #}
+                    <path fill="none" stroke="#9ca3af" stroke-width="5"
+                          d="M 100 10 H 300 A 100 100 0 0 1 300 210 H 100 A 100 100 0 0 1 100 10 Z"
+                          opacity="{% if track_analysis.line_counts.board %}0.55{% else %}0.2{% endif %}"/>
+                    <path fill="none" stroke="#ffffff" stroke-width="3"
+                          d="M 100 10 H 300 A 100 100 0 0 1 300 210 H 100 A 100 100 0 0 1 100 10 Z"
+                          opacity="{% if track_analysis.line_counts.board %}1{% else %}0.35{% endif %}"/>
+
+                    {# Stayer — blue, mid-wood #}
+                    <path fill="none" stroke="#2563eb" stroke-width="3"
+                          d="M 100 31 H 300 A 79 79 0 0 1 300 189 H 100 A 79 79 0 0 1 100 31 Z"
+                          opacity="{% if track_analysis.line_counts.stayer %}1{% else %}0.35{% endif %}"/>
+
+                    {# Start/finish line on far straight: wood + corridor (board→corridor inner) #}
+                    <g aria-hidden="true">
+                        <rect x="195" y="10" width="3.5" height="50" fill="#ffffff"/>
+                        <rect x="198.5" y="10" width="3" height="50" fill="#111827"/>
+                        <rect x="201.5" y="10" width="3.5" height="50" fill="#ffffff"/>
+                    </g>
+
+                    {# Labels on near straight; «коридор» — under the corridor band #}
+                    <text x="200" y="206" text-anchor="middle" fill="#374151"
+                          font-size="8" font-weight="700"
+                          opacity="{% if track_analysis.line_counts.board %}0.95{% else %}0.4{% endif %}">борт</text>
+                    <text x="200" y="185" text-anchor="middle" fill="#1e3a8a"
+                          font-size="8" font-weight="700"
+                          opacity="{% if track_analysis.line_counts.stayer %}0.95{% else %}0.4{% endif %}">стаер</text>
+                    <text x="200" y="172" text-anchor="middle" fill="#7f1d1d"
+                          font-size="8" font-weight="700"
+                          opacity="{% if track_analysis.line_counts.corridor %}0.95{% else %}0.4{% endif %}">коридор</text>
+                    <text x="200" y="148" text-anchor="middle" fill="#0c4a6e"
+                          font-size="8" font-weight="700"
+                          opacity="{% if track_analysis.line_counts.slow %}0.95{% else %}0.4{% endif %}">лазурка</text>
+                </svg>
+            </div>
+            <ul class="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-ink">
+                {% for row in track_analysis.line_rows %}
+                    <li class="inline-flex items-center gap-1.5">
+                        <span class="inline-block h-2.5 w-2.5 rounded-sm border border-gray-300"
+                              style="background-color: {{ row.color }};"></span>
+                        {{ row.label }}: <span class="font-semibold tabular-nums">{{ row.laps }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {# Time timeline #}
+        {% if track_analysis.timeline %}
+        <div class="mb-2">
+            <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">По времени</h4>
+            <div class="flex h-8 w-full overflow-hidden rounded border border-gray-300 bg-gray-200"
+                 data-track-timeline
+                 title="Распределение линий по времени тренировки">
+                {% for seg in track_analysis.timeline %}
+                    <div class="h-full"
+                         style="width: {{ seg.pct_css }}%; min-width: 2px; background-color: {{ seg.color }};{% if seg.line == 'board' %} box-shadow: inset 0 0 0 1px #d1d5db;{% endif %}"
+                         title="{{ seg.line_label }} · {{ seg.laps }} кр."></div>
+                {% endfor %}
+            </div>
+            <p class="mt-1 text-[11px] text-ink-muted">Цвет сегмента — линия; ширина — доля времени.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <h3 class="mb-3 text-sm font-bold text-ink sm:text-base">Круги по линиям</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left text-xs text-ink sm:text-sm">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-2 py-2 font-medium sm:px-3">Линия</th>
+                        <th class="px-2 py-2 font-medium sm:px-3">Круги</th>
+                        <th class="px-2 py-2 font-medium sm:px-3">Доля</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in track_analysis.line_rows %}
+                    <tr class="border-b border-gray-200">
+                        <td class="px-2 py-2 sm:px-3 sm:py-2.5">
+                            <span class="inline-flex items-center gap-2">
+                                <span class="inline-block h-2.5 w-2.5 rounded-sm border border-gray-300"
+                                      style="background-color: {{ row.color }};"></span>
+                                {{ row.label }}
+                            </span>
+                        </td>
+                        <td class="px-2 py-2 tabular-nums sm:px-3 sm:py-2.5">{{ row.laps }}</td>
+                        <td class="px-2 py-2 tabular-nums sm:px-3 sm:py-2.5">{{ row.pct }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <h3 class="mb-3 text-sm font-bold text-ink sm:text-base">Смены</h3>
+        {% if track_analysis.rotations.available %}
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded border border-gray-200 px-4 py-3">
+                    <div class="stat-label">На смене (лидер)</div>
+                    <div class="stat-value">{{ track_analysis.rotations.leader_laps }}
+                        <span class="stat-unit">кр.</span>
+                    </div>
+                </div>
+                <div class="rounded border border-gray-200 px-4 py-3">
+                    <div class="stat-label">За лидером</div>
+                    <div class="stat-value">{{ track_analysis.rotations.follower_laps }}
+                        <span class="stat-unit">кр.</span>
+                    </div>
+                </div>
+            </div>
+            {% if track_analysis.rotations.unknown_laps %}
+                <p class="mt-2 text-xs text-ink-muted">
+                    Не определено: {{ track_analysis.rotations.unknown_laps }} кр.
+                    (рваный темп или близкие значения мощности).
+                </p>
+            {% endif %}
+        {% else %}
+            <div class="rounded border border-dashed border-gray-300 bg-feed px-4 py-4">
+                <p class="text-sm text-ink-muted">
+                    {% if track_analysis.rotations.reason == 'no_power' %}
+                        Блок смен недоступен: в файле нет данных мощности.
+                    {% else %}
+                        Недостаточно сигнала мощности для оценки смен.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

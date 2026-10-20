@@ -41,6 +41,8 @@
                 {{ form.activity_type }}
             </div>
 
+            {% include 'includes/track_fields.html' with form=form %}
+
             <button type="submit" class="btn-brand w-full">Загрузить</button>
         </form>
     </div>

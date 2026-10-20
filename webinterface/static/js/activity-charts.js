@@ -1,13 +1,15 @@
 /**
- * Render activity stream charts (speed / hr / power / elevation) with Chart.js.
+ * Render activity stream charts (speed / cadence / hr / power / elevation) with Chart.js.
  * X-axis is elapsed time; hover syncs a vertical crosshair across all charts.
  * Each chart marks its max point and draws an average horizontal line.
  * Elevation is drawn as a gray filled background on metric charts.
+ * Track line timeline (if present) is painted as background bands on metric charts.
  */
 (function () {
   var syncTime = null;
   var charts = [];
   var rafId = null;
+  var trackSegments = [];
 
   function pad2(n) {
     return n < 10 ? '0' + n : String(n);
@@ -124,11 +126,46 @@
     return a.y + (b.y - a.y) * k;
   }
 
+  function hexToRgba(hex, alpha) {
+    if (!hex || hex.charAt(0) !== '#' || (hex.length !== 7 && hex.length !== 4)) {
+      return 'rgba(156, 163, 175, ' + alpha + ')';
+    }
+    var h = hex.slice(1);
+    if (h.length === 3) {
+      h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    }
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
+
+  function lineAtTime(t) {
+    if (t == null || !trackSegments.length) return null;
+    for (var i = 0; i < trackSegments.length; i++) {
+      var seg = trackSegments[i];
+      var a = Number(seg.t_start);
+      var b = Number(seg.t_end);
+      if (t >= a && t <= b) return seg;
+    }
+    // Nearest segment if slightly outside due to rounding.
+    var best = null;
+    var bestDist = Infinity;
+    for (var j = 0; j < trackSegments.length; j++) {
+      var s = trackSegments[j];
+      var d = Math.min(Math.abs(t - Number(s.t_start)), Math.abs(t - Number(s.t_end)));
+      if (d < bestDist) {
+        bestDist = d;
+        best = s;
+      }
+    }
+    return bestDist <= 2 ? best : null;
+  }
+
   function drawValueBadge(ctx, x, y, text, color, area) {
     ctx.save();
     ctx.font = '600 11px system-ui, sans-serif';
     var padX = 6;
-    var padY = 3;
     var tw = ctx.measureText(text).width;
     var bw = tw + padX * 2;
     var bh = 16;
@@ -153,6 +190,75 @@
     ctx.restore();
   }
 
+  function drawLineBadge(ctx, x, area, seg) {
+    if (!seg) return;
+    var label = seg.line_label || seg.line || '';
+    if (!label) return;
+    var color = seg.color || '#6b7280';
+    var textColor = seg.line === 'board' || seg.line === 'slow' ? '#111827' : '#fff';
+    ctx.save();
+    ctx.font = '600 11px system-ui, sans-serif';
+    var padX = 6;
+    var tw = ctx.measureText(label).width;
+    var bw = tw + padX * 2;
+    var bh = 16;
+    var bx = x + 10;
+    var by = area.top + 4;
+    if (bx + bw > area.right - 2) bx = x - 10 - bw;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(bx, by, bw, bh, 3);
+    } else {
+      ctx.rect(bx, by, bw, bh);
+    }
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (seg.line === 'board') {
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + padX, by + bh / 2);
+    ctx.restore();
+  }
+
+  var trackBandsPlugin = {
+    id: 'trackBands',
+    beforeDatasetsDraw: function (chart) {
+      var opts = chart.options.plugins && chart.options.plugins.trackBands;
+      if (!opts || !opts.enabled || !trackSegments.length) return;
+      var ctx = chart.ctx;
+      var area = chart.chartArea;
+      var xScale = chart.scales.x;
+      if (!area || !xScale) return;
+
+      ctx.save();
+      for (var i = 0; i < trackSegments.length; i++) {
+        var seg = trackSegments[i];
+        var x0 = xScale.getPixelForValue(Number(seg.t_start));
+        var x1 = xScale.getPixelForValue(Number(seg.t_end));
+        if (!isFinite(x0) || !isFinite(x1)) continue;
+        if (x1 < area.left || x0 > area.right) continue;
+        x0 = Math.max(area.left, Math.min(area.right, x0));
+        x1 = Math.max(area.left, Math.min(area.right, x1));
+        var w = Math.max(1, x1 - x0);
+        var fill = seg.color || '#9ca3af';
+        var alpha = seg.line === 'board' ? 0.55 : 0.22;
+        ctx.fillStyle = hexToRgba(fill, alpha);
+        ctx.fillRect(x0, area.top, w, area.bottom - area.top);
+        if (seg.line === 'board') {
+          ctx.strokeStyle = 'rgba(209, 213, 219, 0.9)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x0 + 0.5, area.top + 0.5, w - 1, area.bottom - area.top - 1);
+        }
+      }
+      ctx.restore();
+    },
+  };
+
   var overlaysPlugin = {
     id: 'chartOverlays',
     afterDatasetsDraw: function (chart) {
@@ -168,6 +274,8 @@
       var avg = opts.avg;
       var color = opts.color || '#333';
       var series = opts.series || ((chart.data.datasets[0] && chart.data.datasets[0].data) || []);
+      var showTrackLine = !!(chart.options.plugins && chart.options.plugins.trackBands
+        && chart.options.plugins.trackBands.enabled);
 
       if (avg != null) {
         var avgY = yScale.getPixelForValue(avg);
@@ -195,6 +303,10 @@
       ctx.strokeStyle = 'rgba(28, 28, 30, 0.55)';
       ctx.stroke();
       ctx.restore();
+
+      if (showTrackLine) {
+        drawLineBadge(ctx, x, area, lineAtTime(syncTime));
+      }
 
       var value = valueAtTime(series, syncTime);
       if (value == null) return;
@@ -255,7 +367,7 @@
     };
   }
 
-  function makeChart(canvas, label, data, color, xRange, eleData) {
+  function makeChart(canvas, label, data, color, xRange, eleData, withTrackBands) {
     if (!window.Chart || !canvas || !data.length) return null;
 
     var s = stats(data);
@@ -276,7 +388,8 @@
       pointRadius: 0,
       pointHoverRadius: 0,
       tension: 0,
-      fill: !hasEle,
+      // Keep area clear when track line bands are shown underneath.
+      fill: !hasEle && !withTrackBands,
       spanGaps: false,
       parsing: false,
       yAxisID: 'y',
@@ -368,11 +481,12 @@
         plugins: {
           legend: { display: false },
           chartOverlays: { avg: s.avg, color: color, series: data },
+          trackBands: { enabled: !!withTrackBands },
           tooltip: { enabled: false },
         },
         scales: scales,
       },
-      plugins: [overlaysPlugin],
+      plugins: [trackBandsPlugin, overlaysPlugin],
     });
   }
 
@@ -386,11 +500,19 @@
       return;
     }
 
+    try {
+      trackSegments = JSON.parse(el.getAttribute('data-track-timeline') || '[]') || [];
+    } catch (e2) {
+      trackSegments = [];
+    }
+    if (!Array.isArray(trackSegments)) trackSegments = [];
+
     var durationSec = Number(el.getAttribute('data-duration') || 0);
     var times = streams.time || null;
     if (!times || !times.length) {
       var n = Math.max(
         (streams.speed || []).length,
+        (streams.cadence || []).length,
         (streams.hr || []).length,
         (streams.power || []).length,
         (streams.ele || []).length
@@ -403,17 +525,20 @@
     }
 
     var speed = toPoints(streams.speed, times);
+    var cadence = toPoints(streams.cadence, times);
     var hr = toPoints(streams.hr, times);
     var power = toPoints(streams.power, times);
     var ele = toPoints(streams.ele, times);
-    var range = xExtent([speed, hr, power, ele]);
+    var range = xExtent([speed, cadence, hr, power, ele]);
     if (durationSec > range.max) range.max = durationSec;
 
+    // id, label, data, color, useEleBg, trackBands
     var specs = [
-      ['chart-speed', 'Скорость, км/ч', speed, '#FC5200', true],
-      ['chart-hr', 'Пульс', hr, '#E8192E', true],
-      ['chart-power', 'Мощность, Вт', power, '#007FB6', true],
-      ['chart-ele', 'Высота, м', ele, '#6d6d78', false],
+      ['chart-speed', 'Скорость, км/ч', speed, '#FC5200', true, true],
+      ['chart-cadence', 'Каденс, об/мин', cadence, '#7C3AED', true, true],
+      ['chart-hr', 'Пульс', hr, '#E8192E', true, true],
+      ['chart-power', 'Мощность, Вт', power, '#007FB6', true, true],
+      ['chart-ele', 'Высота, м', ele, '#6d6d78', false, false],
     ];
 
     specs.forEach(function (spec) {
@@ -427,7 +552,8 @@
         return;
       }
       var bgEle = spec[4] ? ele : null;
-      var chart = makeChart(canvas, spec[1], data, spec[3], range, bgEle);
+      var withBands = !!(spec[5] && trackSegments.length);
+      var chart = makeChart(canvas, spec[1], data, spec[3], range, bgEle, withBands);
       if (chart) {
         charts.push(chart);
         bindSyncEvents(chart);

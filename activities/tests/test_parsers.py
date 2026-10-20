@@ -43,6 +43,9 @@ class FitParserTest(TestCase):
         self.assertEqual(len(parsed.streams['time']), len(parsed.streams.get('speed') or parsed.streams.get('hr')))
         self.assertGreaterEqual(parsed.streams['time'][-1], parsed.streams['time'][0])
         self.assertIsNotNone(parsed.avg_moving_speed)
+        # Distance stream is optional but must align when present.
+        if parsed.streams.get('distance'):
+            self.assertEqual(len(parsed.streams['distance']), len(parsed.streams['time']))
 
 
 class MetricsHelpersTest(TestCase):

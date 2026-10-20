@@ -24,6 +24,9 @@
                                         {% if activity.is_indoor %}
                                             · <span class="font-semibold text-ink">Indoor</span>
                                         {% endif %}
+                                        {% if activity.is_track %}
+                                            · <span class="font-semibold text-ink">На треке</span>{% if activity.track_lap_length_display %} · {{ activity.track_lap_length_display }}{% endif %}
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>

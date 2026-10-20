@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -90,6 +91,7 @@ class SyncServiceTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         ActivityType.objects.create(name='Шоссейный велосипед')
+        ActivityType.objects.create(name='Трековый велосипед')
         ActivityType.objects.create(name='Бег')
 
     def setUp(self):
@@ -135,6 +137,25 @@ class SyncServiceTest(TestCase):
         self.assertEqual(activity.title, 'Morning Ride')
         self.assertEqual(activity.activity_type.name, 'Шоссейный велосипед')
         self.assertTrue(activity.track_points)
+        self.assertFalse(activity.is_track)
+
+    def test_import_track_cycling_sets_is_track(self):
+        self.profile.trains_on_track = True
+        self.profile.default_track_lap_length_m = Decimal('250')
+        self.profile.save()
+        client = MagicMock()
+        client.download_original_file.return_value = self.fit_bytes
+        remote = {
+            'id': 'i101',
+            'name': 'Track session',
+            'type': 'TrackCycling',
+            'file_type': 'fit',
+        }
+        activity = import_remote_activity(self.connection, client, remote)
+        self.assertIsNotNone(activity)
+        self.assertEqual(activity.activity_type.name, 'Трековый велосипед')
+        self.assertTrue(activity.is_track)
+        self.assertEqual(float(activity.track_lap_length_m), 250.0)
 
     def test_import_idempotent_by_external_id(self):
         client = MagicMock()
