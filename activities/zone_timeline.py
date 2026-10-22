@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Optional
 
 from django.core.files.base import ContentFile
@@ -18,6 +19,16 @@ BAR_BOTTOM = 120
 LEGEND_Y = 136
 BG = (249, 250, 251)
 GAP = 1
+
+_BUNDLED_FONT = Path(__file__).resolve().parent / 'fonts' / 'DejaVuSans.ttf'
+_SYSTEM_FONTS = (
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
+    '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+    '/Library/Fonts/Arial.ttf',
+    '/Library/Fonts/Arial Unicode.ttf',
+)
 
 
 def _stream_has_data(values: Any) -> bool:
@@ -54,13 +65,13 @@ def _downsample(values: list, times: list, n: int) -> list[Optional[float]]:
 
 
 def _font(size: int = 12):
-    try:
-        return ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', size)
-    except OSError:
+    candidates = (_BUNDLED_FONT,) + tuple(Path(p) for p in _SYSTEM_FONTS)
+    for path in candidates:
         try:
-            return ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', size)
+            return ImageFont.truetype(str(path), size)
         except OSError:
-            return ImageFont.load_default()
+            continue
+    return ImageFont.load_default()
 
 
 def _hex_to_rgb(color: str) -> tuple[int, int, int]:

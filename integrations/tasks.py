@@ -5,8 +5,10 @@ import logging
 from celery import shared_task
 from django.contrib.auth import get_user_model
 
+from .garmin_client import GarminApiError
 from .intervals_client import IntervalsApiError
-from .models import IntervalsConnection
+from .models import GarminConnection, IntervalsConnection
+from . import garmin_sync as garmin_sync_service
 from . import sync as sync_service
 
 logger = logging.getLogger(__name__)
@@ -74,5 +76,42 @@ def sync_all_connections() -> dict:
     count = 0
     for connection_id in qs.values_list('pk', flat=True):
         sync_connection.delay(connection_id, initial=False)
+        count += 1
+    return {'ok': True, 'enqueued': count}
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=120)
+def sync_garmin_connection(self, connection_id: int, initial: bool = False) -> dict:
+    try:
+        connection = GarminConnection.objects.select_related('profile').get(pk=connection_id)
+    except GarminConnection.DoesNotExist:
+        return {'ok': False, 'error': 'not_found'}
+
+    if not connection.is_active:
+        return {'ok': False, 'error': 'inactive'}
+
+    try:
+        created = garmin_sync_service.sync_connection(connection, initial=initial)
+    except GarminApiError as exc:
+        logger.warning('Garmin sync failed for %s: %s', connection_id, exc)
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            return {'ok': False, 'error': str(exc)}
+    except Exception as exc:
+        connection.last_error = str(exc)
+        connection.save(update_fields=['last_error', 'updated_at'])
+        logger.exception('Garmin sync error for %s', connection_id)
+        return {'ok': False, 'error': str(exc)}
+
+    return {'ok': True, 'created': created}
+
+
+@shared_task
+def sync_all_garmin_connections() -> dict:
+    qs = GarminConnection.objects.filter(is_active=True, initial_sync_done=True)
+    count = 0
+    for connection_id in qs.values_list('pk', flat=True):
+        sync_garmin_connection.delay(connection_id, initial=False)
         count += 1
     return {'ok': True, 'enqueued': count}

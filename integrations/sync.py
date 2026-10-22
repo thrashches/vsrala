@@ -12,12 +12,18 @@ from django.utils import timezone as dj_timezone
 from activities.models import Activity, ActivityType
 from activities.parsers import TrackParseError, parse_track
 
+from .dedup import (
+    SOURCE_INTERVALS,
+    find_activity_by_external_id,
+    find_duplicate_activity,
+    merge_activity,
+)
 from .intervals_client import IntervalsApiError, IntervalsClient
 from .models import IntervalsConnection
 
 logger = logging.getLogger(__name__)
 
-EXTERNAL_SOURCE = 'intervals'
+EXTERNAL_SOURCE = SOURCE_INTERVALS
 
 # Map Intervals.icu sport types to local ActivityType names.
 TYPE_NAME_MAP = {
@@ -101,16 +107,11 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
         connection.save(update_fields=['last_error', 'updated_at'])
         raise
 
-    existing_ids = set(
-        Activity.objects.filter(
-            profile=connection.profile,
-            external_source=EXTERNAL_SOURCE,
-        ).exclude(external_id='').values_list('external_id', flat=True)
-    )
-
     for remote in remote_activities:
         activity_id = str(remote.get('id') or '')
-        if not activity_id or activity_id in existing_ids:
+        if not activity_id:
+            continue
+        if find_activity_by_external_id(connection.profile, EXTERNAL_SOURCE, activity_id):
             continue
         try:
             activity = import_remote_activity(connection, client, remote)
@@ -121,9 +122,8 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
                 connection.profile_id,
             )
             continue
-        if activity is not None:
+        if activity is not None and getattr(activity, '_was_created', False):
             created += 1
-            existing_ids.add(activity_id)
 
     connection.last_synced_at = dj_timezone.now()
     connection.last_error = ''
@@ -159,6 +159,63 @@ def import_remote_activity(
     description = (remote.get('description') or '').strip() or None
     activity_type = resolve_activity_type(remote.get('type'))
 
+    temp = Activity(
+        profile=connection.profile,
+        title=title,
+        description=description,
+        activity_type=activity_type,
+        started_at=parsed.started_at,
+    )
+    temp.apply_parsed_track(parsed)
+
+    field_values = {
+        'title': title,
+        'description': description,
+        'activity_type': activity_type,
+        'started_at': parsed.started_at,
+        'duration': temp.duration,
+        'duration_active': temp.duration_active,
+        'distance': temp.distance,
+        'avg_speed': temp.avg_speed,
+        'avg_moving_speed': temp.avg_moving_speed,
+        'max_speed': temp.max_speed,
+        'avg_hr': temp.avg_hr,
+        'max_hr': temp.max_hr,
+        'avg_power': temp.avg_power,
+        'max_power': temp.max_power,
+        'normalized_power': temp.normalized_power,
+        'tss': temp.tss,
+        'avg_cadence': temp.avg_cadence,
+        'max_cadence': temp.max_cadence,
+        'elevation_gain': temp.elevation_gain,
+        'elevation_loss': temp.elevation_loss,
+        'elevation_min': temp.elevation_min,
+        'elevation_max': temp.elevation_max,
+        'track_points': temp.track_points,
+        'streams': temp.streams,
+        'is_indoor': temp.is_indoor,
+        'track_file': ContentFile(file_bytes, name=filename),
+    }
+
+    existing = find_duplicate_activity(
+        connection.profile,
+        started_at=parsed.started_at,
+        distance=temp.distance,
+        duration=temp.duration,
+    )
+    if existing is not None:
+        # Garmin wins on conflicts: only fill empty fields when merging Intervals in.
+        prefer_incoming = existing.external_source != 'garmin' and 'garmin' not in (existing.external_refs or {})
+        merge_activity(
+            existing,
+            source=EXTERNAL_SOURCE,
+            external_id=activity_id,
+            field_values=field_values,
+            prefer_incoming=prefer_incoming,
+        )
+        existing._was_created = False  # type: ignore[attr-defined]
+        return existing
+
     activity = Activity(
         profile=connection.profile,
         title=title,
@@ -166,6 +223,7 @@ def import_remote_activity(
         activity_type=activity_type,
         external_source=EXTERNAL_SOURCE,
         external_id=activity_id,
+        external_refs={EXTERNAL_SOURCE: activity_id},
         started_at=parsed.started_at,
     )
     activity.apply_parsed_track(parsed)
@@ -181,6 +239,7 @@ def import_remote_activity(
     from activities.zone_timeline import apply_zone_timeline
     apply_map_preview(activity)
     apply_zone_timeline(activity)
+    activity._was_created = True  # type: ignore[attr-defined]
     return activity
 
 

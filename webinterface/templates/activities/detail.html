@@ -25,6 +25,7 @@
                         {% if activity.is_indoor %}
                             · <span class="font-semibold text-ink">Indoor</span>
                         {% endif %}
+                        · {% include 'includes/activity_source.html' with activity=activity %}
                     </div>
                     <h1 class="mt-2 text-2xl font-bold text-ink">{{ activity.title }}</h1>
                     {% if activity.description %}
@@ -136,23 +137,66 @@
         {% endif %}
 
         <div data-activity-tabs class="border-t border-gray-100">
-            <div class="flex flex-nowrap gap-1 overflow-x-auto border-b border-gray-100 px-5" role="tablist">
-                <button type="button" role="tab" data-tab="stats" aria-selected="true"
-                        class="shrink-0 border-b-2 border-brand px-2.5 py-2.5 text-xs font-semibold text-brand sm:px-3 sm:py-3 sm:text-sm">
-                    Статистика
-                </button>
-                <button type="button" role="tab" data-tab="hr" aria-selected="false"
-                        class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
-                    Пульс
-                </button>
-                <button type="button" role="tab" data-tab="power" aria-selected="false"
-                        class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
-                    Мощность
-                </button>
-                <button type="button" role="tab" data-tab="best" aria-selected="false"
-                        class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
-                    Лучшее время
-                </button>
+            <div class="flex items-stretch border-b border-gray-100 px-5">
+                <div class="flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto" role="tablist">
+                    <button type="button" role="tab" data-tab="stats" aria-selected="true"
+                            class="shrink-0 border-b-2 border-brand px-2.5 py-2.5 text-xs font-semibold text-brand sm:px-3 sm:py-3 sm:text-sm">
+                        Статистика
+                    </button>
+                    <button type="button" role="tab" data-tab="hr" aria-selected="false"
+                            class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
+                        Пульс
+                    </button>
+                    <button type="button" role="tab" data-tab="power" aria-selected="false"
+                            class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
+                        Мощность
+                    </button>
+                    <button type="button" role="tab" data-tab="best" aria-selected="false"
+                            class="shrink-0 border-b-2 border-transparent px-2.5 py-2.5 text-xs font-semibold text-ink-muted hover:text-ink sm:px-3 sm:py-3 sm:text-sm">
+                        Лучшее время
+                    </button>
+                </div>
+                {% if is_owner %}
+                    <div class="relative ml-1 flex shrink-0 items-center" data-activity-menu>
+                        <button type="button"
+                                class="rounded p-1.5 text-ink-muted hover:bg-gray-100 hover:text-ink"
+                                aria-expanded="false"
+                                aria-haspopup="true"
+                                aria-label="Действия с тренировкой"
+                                data-activity-menu-toggle>
+                            <span class="material-icons text-[22px] leading-none" aria-hidden="true">more_vert</span>
+                        </button>
+                        <div class="absolute right-0 top-full z-20 mt-1 hidden w-48 overflow-hidden rounded border border-gray-200 bg-white py-1 shadow-card"
+                             role="menu"
+                             data-activity-menu-panel>
+                            {% if activity.track_file %}
+                                <a href="{% url 'webinterface:activity_fit_download' activity.pk %}"
+                                   class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                                   role="menuitem"
+                                   download>
+                                    <span class="material-icons text-[18px] leading-none text-ink-muted" aria-hidden="true">download</span>
+                                    Скачать .fit
+                                </a>
+                            {% endif %}
+                            <a href="{% url 'webinterface:activity_edit' activity.pk %}"
+                               class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                               role="menuitem">
+                                <span class="material-icons text-[18px] leading-none text-ink-muted" aria-hidden="true">edit</span>
+                                Редактировать
+                            </a>
+                            <form method="post" action="{% url 'webinterface:activity_delete' activity.pk %}"
+                                  onsubmit="return confirm('Удалить тренировку?');">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                                        role="menuitem">
+                                    <span class="material-icons text-[18px] leading-none" aria-hidden="true">delete</span>
+                                    Удалить
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
             <div data-tab-panel="stats" class="px-5 py-5">
@@ -316,6 +360,50 @@
                         </dl>
                     </div>
                     {% endif %}
+
+                    {% if activity.calories or activity.aerobic_training_effect or activity.anaerobic_training_effect or activity.device_name or activity.avg_temperature or activity.vo2max %}
+                    <div class="rounded border border-gray-200 px-4 py-3">
+                        <h3 class="mb-3 text-sm font-semibold text-ink">Garmin</h3>
+                        <dl class="space-y-2 text-sm">
+                            {% if activity.calories %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">Калории</dt>
+                                <dd class="font-semibold text-ink">{{ activity.calories }} <span class="font-normal text-ink-muted">ккал</span></dd>
+                            </div>
+                            {% endif %}
+                            {% if activity.aerobic_training_effect %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">Training Effect (аэробный)</dt>
+                                <dd class="font-semibold text-ink">{{ activity.aerobic_training_effect }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if activity.anaerobic_training_effect %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">Training Effect (анаэробный)</dt>
+                                <dd class="font-semibold text-ink">{{ activity.anaerobic_training_effect }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if activity.vo2max %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">VO₂max</dt>
+                                <dd class="font-semibold text-ink">{{ activity.vo2max }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if activity.avg_temperature %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">Температура</dt>
+                                <dd class="font-semibold text-ink">{{ activity.avg_temperature }} <span class="font-normal text-ink-muted">°C</span></dd>
+                            </div>
+                            {% endif %}
+                            {% if activity.device_name %}
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-ink-muted">Устройство</dt>
+                                <dd class="font-semibold text-ink">{{ activity.device_name }}</dd>
+                            </div>
+                            {% endif %}
+                        </dl>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -348,6 +436,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="{% static 'js/activity-charts.js' %}"></script>
 <script src="{% static 'js/activity-tabs.js' %}"></script>
+<script src="{% static 'js/activity-menu.js' %}"></script>
 <script src="{% static 'js/activity-reactions.js' %}"></script>
 <script src="{% static 'js/activity-comments.js' %}"></script>
 {% endblock %}

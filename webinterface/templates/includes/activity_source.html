@@ -1,0 +1,19 @@
+{% load static %}
+{% with src=activity.external_source %}
+{% if src == 'garmin' %}
+<span class="inline-flex items-center gap-1 align-middle" title="Garmin" aria-label="Источник: Garmin">
+    <img src="{% static 'img/source-garmin.svg' %}" alt="" class="h-3.5 w-3.5" width="14" height="14">
+    <span class="sr-only">Garmin</span>
+</span>
+{% elif src == 'intervals' %}
+<span class="inline-flex items-center gap-1 align-middle" title="Intervals.icu" aria-label="Источник: Intervals.icu">
+    <img src="{% static 'img/source-intervals.svg' %}" alt="" class="h-3.5 w-3.5" width="14" height="14">
+    <span class="sr-only">Intervals.icu</span>
+</span>
+{% else %}
+<span class="inline-flex items-center gap-1 align-middle" title="Загружено пользователем" aria-label="Источник: загружено пользователем">
+    <img src="{% static 'img/source-upload.svg' %}" alt="" class="h-3.5 w-3.5" width="14" height="14">
+    <span class="sr-only">Загружено</span>
+</span>
+{% endif %}
+{% endwith %}

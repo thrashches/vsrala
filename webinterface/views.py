@@ -22,18 +22,20 @@ from activities.comments import (
     serialize_comment,
     update_comment,
 )
-from activities.forms import ActivityUploadForm
+from activities.forms import ActivityEditForm, ActivityUploadForm
 from activities.leaderboard import VALID_METRICS, VALID_WEEKS, weekly_leaders
 from activities.models import Activity, ActivityComment, ActivityReaction, ActivityType
 from activities.parsers import TrackParseError, parse_track
 from activities.reactions import reaction_summary_for_activities, toggle_reaction
 from activities.year_stats import build_year_stats
 from activities.zone_distribution import compute_zone_distribution, stream_has_data
-from integrations.forms import IntervalsConnectForm
+from integrations.forms import GarminConnectForm, IntervalsConnectForm
+from integrations.garmin_client import GarminApiError
 from integrations.intervals_client import IntervalsApiError
-from integrations.models import IntervalsConnection
+from integrations.models import GarminConnection, IntervalsConnection
+from integrations import garmin_sync as garmin_sync_service
 from integrations.sync import connect_profile, disconnect_profile
-from integrations.tasks import sync_connection
+from integrations.tasks import sync_connection, sync_garmin_connection
 from profiles.forms import DeleteAccountForm, PasswordChangeForm, ProfileSettingsForm
 from profiles.models import Follow, FollowRequest, Profile
 from profiles.zones import resolve_hr_zones, resolve_power_zones
@@ -251,6 +253,58 @@ class ActivityDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
+class ActivityDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        if activity.profile_id != request.user.pk:
+            raise Http404
+        activity.delete()
+        messages.success(request, 'Тренировка удалена')
+        return redirect('webinterface:my_activities')
+
+
+class ActivityEditView(LoginRequiredMixin, View):
+    template_name = 'activities/edit.html'
+
+    def _get_owned(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        if activity.profile_id != request.user.pk:
+            raise Http404
+        return activity
+
+    def get(self, request, pk):
+        activity = self._get_owned(request, pk)
+        return render(request, self.template_name, {
+            'form': ActivityEditForm(instance=activity),
+            'activity': activity,
+        })
+
+    def post(self, request, pk):
+        activity = self._get_owned(request, pk)
+        form = ActivityEditForm(request.POST, instance=activity)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'activity': activity})
+        form.save()
+        messages.success(request, 'Тренировка обновлена')
+        return redirect('webinterface:activity_detail', pk=activity.pk)
+
+
+class ActivityFitDownloadView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        activity = get_object_or_404(Activity, pk=pk)
+        if activity.profile_id != request.user.pk:
+            raise Http404
+        if not activity.track_file:
+            raise Http404
+        filename = activity.track_file.name.rsplit('/', 1)[-1] or 'activity.fit'
+        return FileResponse(
+            activity.track_file.open('rb'),
+            as_attachment=True,
+            filename=filename,
+            content_type='application/octet-stream',
+        )
+
+
 class ActivityReactView(LoginRequiredMixin, View):
     def post(self, request, pk):
         activity = get_object_or_404(
@@ -375,6 +429,9 @@ class ProfileSettingsView(LoginRequiredMixin, View):
         intervals_form = IntervalsConnectForm(
             data=request.POST if action == 'intervals_connect' else None,
         )
+        garmin_form = GarminConnectForm(
+            data=request.POST if action == 'garmin_connect' else None,
+        )
 
         if action == 'profile':
             if profile_form.is_valid():
@@ -384,6 +441,7 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             password_form = PasswordChangeForm(user=request.user)
             delete_form = DeleteAccountForm(user=request.user)
             intervals_form = IntervalsConnectForm()
+            garmin_form = GarminConnectForm()
         elif action == 'password':
             if password_form.is_valid():
                 password_form.save()
@@ -393,6 +451,7 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             profile_form = ProfileSettingsForm(instance=request.user)
             delete_form = DeleteAccountForm(user=request.user)
             intervals_form = IntervalsConnectForm()
+            garmin_form = GarminConnectForm()
         elif action == 'delete':
             if delete_form.is_valid():
                 user = request.user
@@ -403,6 +462,7 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             profile_form = ProfileSettingsForm(instance=request.user)
             password_form = PasswordChangeForm(user=request.user)
             intervals_form = IntervalsConnectForm()
+            garmin_form = GarminConnectForm()
         elif action == 'intervals_connect':
             if intervals_form.is_valid():
                 try:
@@ -430,9 +490,58 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             profile_form = ProfileSettingsForm(instance=request.user)
             password_form = PasswordChangeForm(user=request.user)
             delete_form = DeleteAccountForm(user=request.user)
+            garmin_form = GarminConnectForm()
         elif action == 'intervals_disconnect':
             disconnect_profile(request.user)
             messages.success(request, 'Intervals.icu отключён')
+            return redirect('webinterface:settings')
+        elif action == 'garmin_connect':
+            if garmin_form.is_valid():
+                try:
+                    connection = garmin_sync_service.connect_profile(
+                        request.user,
+                        garmin_form.cleaned_data['api_key'],
+                    )
+                except GarminApiError as exc:
+                    garmin_form.add_error(None, f'Не удалось подключиться: {exc}')
+                else:
+                    try:
+                        sync_garmin_connection.delay(connection.pk, initial=True)
+                    except Exception:
+                        messages.warning(
+                            request,
+                            'Garmin подключён, но очередь синхронизации недоступна. '
+                            'Запустите Redis и Celery worker.',
+                        )
+                        return redirect('webinterface:settings')
+                    messages.success(
+                        request,
+                        'Garmin подключён. Начата загрузка тренировок за последние 6 месяцев.',
+                    )
+                    return redirect('webinterface:settings')
+            profile_form = ProfileSettingsForm(instance=request.user)
+            password_form = PasswordChangeForm(user=request.user)
+            delete_form = DeleteAccountForm(user=request.user)
+            intervals_form = IntervalsConnectForm()
+        elif action == 'garmin_disconnect':
+            garmin_sync_service.disconnect_profile(request.user)
+            messages.success(request, 'Garmin отключён')
+            return redirect('webinterface:settings')
+        elif action == 'garmin_sync_power_zones':
+            connection = self._garmin_connection(request.user)
+            if not connection or not connection.is_active:
+                messages.error(request, 'Сначала подключите Garmin')
+                return redirect('webinterface:settings')
+            try:
+                result = garmin_sync_service.sync_power_zones(connection)
+            except GarminApiError as exc:
+                messages.error(request, f'Не удалось синхронизировать зоны: {exc}')
+            else:
+                ftp_note = f', FTP={result["ftp"]}' if result.get('ftp') else ''
+                messages.success(
+                    request,
+                    f'Зоны мощности синхронизированы из Garmin{ftp_note}.',
+                )
             return redirect('webinterface:settings')
         else:
             return redirect('webinterface:settings')
@@ -443,6 +552,8 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             'delete_form': delete_form,
             'intervals_form': intervals_form,
             'intervals_connection': self._intervals_connection(request.user),
+            'garmin_form': garmin_form,
+            'garmin_connection': self._garmin_connection(request.user),
             'active_action': action,
         })
 
@@ -452,6 +563,12 @@ class ProfileSettingsView(LoginRequiredMixin, View):
         except IntervalsConnection.DoesNotExist:
             return None
 
+    def _garmin_connection(self, user):
+        try:
+            return user.garmin_connection
+        except GarminConnection.DoesNotExist:
+            return None
+
     def _context(self, request):
         return {
             'profile_form': ProfileSettingsForm(instance=request.user),
@@ -459,6 +576,8 @@ class ProfileSettingsView(LoginRequiredMixin, View):
             'delete_form': DeleteAccountForm(user=request.user),
             'intervals_form': IntervalsConnectForm(),
             'intervals_connection': self._intervals_connection(request.user),
+            'garmin_form': GarminConnectForm(),
+            'garmin_connection': self._garmin_connection(request.user),
             'active_action': None,
         }
 

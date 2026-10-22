@@ -19,3 +19,18 @@ class IntervalsConnectForm(forms.Form):
 
     def clean_api_key(self):
         return (self.cleaned_data.get('api_key') or '').strip()
+
+
+class GarminConnectForm(forms.Form):
+    api_key = forms.CharField(
+        label='API-ключ',
+        max_length=512,
+        widget=forms.TextInput(attrs={
+            'class': INPUT_CLASS,
+            'placeholder': 'Ключ из Garmin Connect → Personal API Token',
+            'autocomplete': 'off',
+        }),
+    )
+
+    def clean_api_key(self):
+        return (self.cleaned_data.get('api_key') or '').strip()

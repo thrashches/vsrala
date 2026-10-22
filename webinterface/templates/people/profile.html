@@ -90,6 +90,7 @@
                                 {% if activity.is_indoor %}
                                     · <span class="font-semibold text-ink">Indoor</span>
                                 {% endif %}
+                                · {% include 'includes/activity_source.html' with activity=activity %}
                             </div>
                             <h3 class="mt-1 text-lg font-bold">
                                 <a href="{% url 'webinterface:activity_detail' activity.pk %}" class="hover:text-brand">

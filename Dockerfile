@@ -9,6 +9,7 @@ RUN apt-get update \
         zlib1g \
         libpq5 \
         postgresql-client \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

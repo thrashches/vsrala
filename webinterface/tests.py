@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.core.files.base import ContentFile
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -480,3 +481,82 @@ class WeeklyLeadersApiTest(TestCase):
         self.client.login(email='me@example.com', password='testpass123')
         response = self.client.get(self.url, {'metric': 'power'})
         self.assertEqual(response.status_code, 400)
+
+
+class ActivityOwnerActionsTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.owner = Profile.objects.create_user(email='owner@example.com', password='testpass123')
+        self.other = Profile.objects.create_user(
+            email='other@example.com', password='testpass123', is_public=True,
+        )
+        self.activity = Activity.objects.create(
+            profile=self.owner,
+            title='Моя тренировка',
+            distance=10,
+            started_at=timezone.now(),
+        )
+        self.activity.track_file.save('ride.fit', ContentFile(b'fit-bytes'), save=True)
+        self.delete_url = reverse('webinterface:activity_delete', kwargs={'pk': self.activity.pk})
+        self.edit_url = reverse('webinterface:activity_edit', kwargs={'pk': self.activity.pk})
+        self.download_url = reverse('webinterface:activity_fit_download', kwargs={'pk': self.activity.pk})
+        self.detail_url = reverse('webinterface:activity_detail', kwargs={'pk': self.activity.pk})
+
+    def test_owner_can_delete(self):
+        self.client.login(email='owner@example.com', password='testpass123')
+        response = self.client.post(self.delete_url)
+        self.assertRedirects(response, reverse('webinterface:my_activities'))
+        self.assertFalse(Activity.objects.filter(pk=self.activity.pk).exists())
+
+    def test_non_owner_delete_gets_404(self):
+        self.client.login(email='other@example.com', password='testpass123')
+        response = self.client.post(self.delete_url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Activity.objects.filter(pk=self.activity.pk).exists())
+
+    def test_owner_can_edit(self):
+        self.client.login(email='owner@example.com', password='testpass123')
+        response = self.client.post(self.edit_url, {
+            'title': 'Новое название',
+            'description': 'Описание',
+            'activity_type': '',
+        })
+        self.assertRedirects(response, self.detail_url)
+        self.activity.refresh_from_db()
+        self.assertEqual(self.activity.title, 'Новое название')
+        self.assertEqual(self.activity.description, 'Описание')
+
+    def test_non_owner_edit_gets_404(self):
+        self.client.login(email='other@example.com', password='testpass123')
+        response = self.client.get(self.edit_url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_can_download_fit(self):
+        self.client.login(email='owner@example.com', password='testpass123')
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b''.join(response.streaming_content), b'fit-bytes')
+
+    def test_non_owner_download_gets_404(self):
+        self.client.login(email='other@example.com', password='testpass123')
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_detail_shows_menu_actions(self):
+        self.client.login(email='owner@example.com', password='testpass123')
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-activity-menu')
+        self.assertContains(response, 'Скачать .fit')
+        self.assertContains(response, 'Редактировать')
+        self.assertContains(response, 'Удалить')
+        self.assertContains(response, self.edit_url)
+        self.assertContains(response, self.download_url)
+
+    def test_non_owner_detail_hides_menu(self):
+        self.owner.is_public = True
+        self.owner.save(update_fields=['is_public'])
+        self.client.login(email='other@example.com', password='testpass123')
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-activity-menu')

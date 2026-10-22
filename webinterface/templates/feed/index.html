@@ -24,6 +24,7 @@
                                         {% if activity.is_indoor %}
                                             · <span class="font-semibold text-ink">Indoor</span>
                                         {% endif %}
+                                        · {% include 'includes/activity_source.html' with activity=activity %}
                                     </div>
                                 </div>
                             </div>

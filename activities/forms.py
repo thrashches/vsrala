@@ -50,3 +50,31 @@ class ActivityUploadForm(forms.ModelForm):
         if track_file.size > 50 * 1024 * 1024:
             raise ValidationError('Файл слишком большой (макс. 50 МБ)')
         return track_file
+
+
+class ActivityEditForm(forms.ModelForm):
+    class Meta:
+        model = Activity
+        fields = ['title', 'description', 'activity_type']
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand',
+                'placeholder': 'Название (необязательно)',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand',
+                'rows': 3,
+                'placeholder': 'Описание (необязательно)',
+            }),
+            'activity_type': forms.Select(attrs={
+                'class': 'w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand',
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['title'].required = False
+        self.fields['description'].required = False
+        self.fields['activity_type'].required = False
+        self.fields['activity_type'].queryset = ActivityType.objects.all()
+        self.fields['activity_type'].empty_label = 'Тип активности'

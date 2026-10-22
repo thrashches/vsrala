@@ -89,6 +89,28 @@ class Activity(models.Model):
     track_file = models.FileField(blank=True, null=True, upload_to='activities', verbose_name='файл тренировки')
     external_source = models.CharField(max_length=32, blank=True, default='', verbose_name='внешний источник')
     external_id = models.CharField(max_length=64, blank=True, default='', verbose_name='внешний ID')
+    external_refs = models.JSONField(
+        blank=True, null=True, default=dict,
+        verbose_name='ссылки на внешние источники',
+    )
+    calories = models.PositiveIntegerField(blank=True, null=True, verbose_name='калории')
+    aerobic_training_effect = models.DecimalField(
+        blank=True, null=True, max_digits=3, decimal_places=1,
+        verbose_name='аэробный Training Effect',
+    )
+    anaerobic_training_effect = models.DecimalField(
+        blank=True, null=True, max_digits=3, decimal_places=1,
+        verbose_name='анаэробный Training Effect',
+    )
+    device_name = models.CharField(max_length=128, blank=True, default='', verbose_name='устройство')
+    avg_temperature = models.DecimalField(
+        blank=True, null=True, max_digits=5, decimal_places=1,
+        verbose_name='средняя температура',
+    )
+    vo2max = models.DecimalField(
+        blank=True, null=True, max_digits=5, decimal_places=1,
+        verbose_name='VO2max',
+    )
 
     def __str__(self):
         return f'{self.profile.email}: {self.title} {self.created_at}'

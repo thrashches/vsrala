@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from activities.models import Activity
 from activities.parsers.base import ParsedTrack
-from activities.zone_timeline import apply_zone_timeline, build_zone_timeline_for_activity
+from activities.zone_timeline import _font, apply_zone_timeline, build_zone_timeline_for_activity
 from profiles.models import Profile
 from profiles.zones import default_hr_zones, default_power_zones
 
@@ -95,6 +95,15 @@ class ZoneTimelineTest(TestCase):
         content, key = build_zone_timeline_for_activity(activity)
         self.assertIsNone(content)
         self.assertEqual(key, '')
+
+    def test_font_has_cyrillic_glyphs(self):
+        font = _font(12)
+        bbox = font.getbbox('М')
+        self.assertIsNotNone(bbox)
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+        self.assertGreater(width, 0)
+        self.assertGreater(height, 0)
 
     def test_upload_indoor_fit_sets_flag(self):
         # sample.fit from fixtures may be outdoor; synthesize via apply

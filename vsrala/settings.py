@@ -198,6 +198,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'integrations.tasks.sync_all_connections',
         'schedule': 15 * 60,
     },
+    'sync-garmin-every-15-minutes': {
+        'task': 'integrations.tasks.sync_all_garmin_connections',
+        'schedule': 15 * 60,
+    },
 }
 
 # Overpass API (route surface enrichment)
