@@ -25,8 +25,8 @@ from activities.comments import (
 from activities.forms import ActivityEditForm, ActivityUploadForm
 from activities.leaderboard import VALID_METRICS, VALID_WEEKS, weekly_leaders
 from activities.models import Activity, ActivityComment, ActivityReaction, ActivityType
-from activities.parsers import TrackParseError, parse_track
 from activities.reactions import reaction_summary_for_activities, toggle_reaction
+from activities.services import create_activity_from_upload
 from activities.year_stats import build_year_stats
 from activities.zone_distribution import compute_zone_distribution, stream_has_data
 from integrations.forms import GarminConnectForm, IntervalsConnectForm
@@ -37,7 +37,15 @@ from integrations import garmin_sync as garmin_sync_service
 from integrations.sync import connect_profile, disconnect_profile
 from integrations.tasks import sync_connection, sync_garmin_connection
 from profiles.forms import DeleteAccountForm, PasswordChangeForm, ProfileSettingsForm
-from profiles.models import Follow, FollowRequest, Profile
+from django.core.exceptions import ValidationError as DjangoValidationError
+
+from activities.parsers import TrackParseError
+from profiles.models import FollowRequest, Profile
+from profiles.services import (
+    accept_follow_request,
+    reject_follow_request,
+    toggle_follow,
+)
 from profiles.zones import resolve_hr_zones, resolve_power_zones
 from routes.forms import RouteFromActivityForm, RouteMetaForm, RouteUploadForm
 from routes.models import Route
@@ -588,38 +596,17 @@ class ActivityUploadView(LoginRequiredMixin, CreateView):
     template_name = 'activities/upload.html'
 
     def form_valid(self, form):
-        from datetime import datetime, timezone
-        from io import BytesIO
-
-        from django.core.files.base import ContentFile
-
-        activity = form.save(commit=False)
-        activity.profile = self.request.user
-        track_file = form.cleaned_data['track_file']
-        filename = track_file.name
-
-        # Read bytes once: FitFile closes the underlying handle, so we cannot
-        # seek/reuse the uploaded file after parsing.
-        track_file.seek(0)
-        file_bytes = track_file.read()
-
-        # Need a temporary started_at before first save.
-        activity.started_at = datetime.now(timezone.utc)
-
         try:
-            parsed = parse_track(BytesIO(file_bytes), filename=filename)
+            self.object = create_activity_from_upload(
+                profile=self.request.user,
+                track_file=form.cleaned_data['track_file'],
+                title=form.cleaned_data.get('title') or '',
+                description=form.cleaned_data.get('description') or '',
+                activity_type=form.cleaned_data.get('activity_type'),
+            )
         except TrackParseError as exc:
             form.add_error('track_file', str(exc))
             return self.form_invalid(form)
-
-        activity.apply_parsed_track(parsed)
-        activity.track_file = ContentFile(file_bytes, name=filename)
-        activity.save()
-        from activities.map_preview import apply_map_preview
-        from activities.zone_timeline import apply_zone_timeline
-        apply_map_preview(activity)
-        apply_zone_timeline(activity)
-        self.object = activity
         messages.success(self.request, 'Тренировка загружена')
         return redirect(self.get_success_url())
 
@@ -791,38 +778,19 @@ class ProfileFollowersView(LoginRequiredMixin, ListView):
 class ProfileFollowToggleView(LoginRequiredMixin, View):
     def post(self, request, pk):
         target = get_object_or_404(Profile, pk=pk)
-        if target.pk == request.user.pk:
+        try:
+            result = toggle_follow(viewer=request.user, target=target)
+        except DjangoValidationError as exc:
+            message = '; '.join(exc.messages) if hasattr(exc, 'messages') else str(exc)
             if self._wants_json(request):
-                return JsonResponse({'error': 'Нельзя подписаться на себя'}, status=400)
-            return HttpResponseBadRequest('Нельзя подписаться на себя')
-
-        follow = Follow.objects.filter(user=request.user, following=target).first()
-        pending = FollowRequest.objects.filter(from_user=request.user, to_user=target).first()
-        is_following = False
-        request_pending = False
-
-        if follow:
-            follow.delete()
-            if pending:
-                pending.delete()
-        elif pending:
-            pending.delete()
-        else:
-            they_follow_me = Follow.objects.filter(
-                user=target, following=request.user,
-            ).exists()
-            if target.is_public or they_follow_me:
-                Follow.objects.create(user=request.user, following=target)
-                is_following = True
-            else:
-                FollowRequest.objects.create(from_user=request.user, to_user=target)
-                request_pending = True
+                return JsonResponse({'error': message}, status=400)
+            return HttpResponseBadRequest(message)
 
         if self._wants_json(request):
             return JsonResponse({
-                'is_following': is_following,
-                'request_pending': request_pending,
-                'followers_count': target.followers.count(),
+                'is_following': result.is_following,
+                'request_pending': result.request_pending,
+                'followers_count': result.followers_count,
             })
 
         next_url = request.POST.get('next') or reverse(
@@ -854,13 +822,9 @@ class FollowRequestActionView(LoginRequiredMixin, View):
             FollowRequest, pk=pk, to_user=request.user,
         )
         if action == 'accept':
-            Follow.objects.get_or_create(
-                user=follow_request.from_user,
-                following=follow_request.to_user,
-            )
-            follow_request.delete()
+            accept_follow_request(follow_request=follow_request)
         elif action == 'reject':
-            follow_request.delete()
+            reject_follow_request(follow_request=follow_request)
         else:
             return HttpResponseBadRequest('Неизвестное действие')
 

@@ -62,9 +62,12 @@
                         <a href="{% url 'webinterface:settings' %}"
                            class="block px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
                            role="menuitem">Настройки</a>
-                        <a href="{% url 'webinterface:logout' %}"
-                           class="block px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
-                           role="menuitem">Выход</a>
+                        <form method="post" action="{% url 'webinterface:logout' %}" role="none">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="block w-full px-4 py-2 text-left text-sm font-medium text-ink hover:bg-gray-50"
+                                    role="menuitem">Выход</button>
+                        </form>
                     </div>
                 </div>
             </div>

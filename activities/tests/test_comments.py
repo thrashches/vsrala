@@ -10,7 +10,7 @@ from activities.comments import (
     create_comment,
 )
 from activities.models import Activity, ActivityComment
-from profiles.models import Profile
+from profiles.models import Follow, Profile
 
 
 class CommentHelpersTest(TestCase):
@@ -80,6 +80,8 @@ class ActivityCommentViewsTest(TestCase):
             started_at=datetime.now(),
             title='Приватная',
         )
+        # Feed shows own + followed activities only.
+        Follow.objects.create(user=self.author, following=self.owner)
 
     def test_create_comment(self):
         self.client.login(email='author@example.com', password='testpass123')

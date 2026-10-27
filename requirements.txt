@@ -3,8 +3,11 @@ branca==0.8.2
 celery==5.6.3
 certifi==2026.7.22
 charset-normalizer==3.5.2
-Django==4.2.30
-django-celery-beat==2.9.0
+cron-descriptor==2.2.1
+Django==6.1.2
+django-timezone-field==7.2.2
+djangorestframework==3.18.3
+drf-spectacular==0.30.0
 fitparse==1.2.0
 folium==0.20.0
 gpxpy==1.6.2
@@ -14,8 +17,13 @@ MarkupSafe==3.0.4
 numpy==2.5.3
 pillow==12.3.0
 psycopg2-binary==2.9.11
+python-crontab==3.4.0
 redis==6.4.0
 requests==2.34.2
 sqlparse==0.6.0
+tzdata==2026.4
 urllib3==2.8.0
 xyzservices==2026.9.1
+# django-celery-beat: PyPI 2.9.0 pins Django<6.1. After `pip install -r requirements.txt`:
+#   pip install --no-deps "django-celery-beat @ git+https://github.com/celery/django-celery-beat.git@c962a182c21d499f206866f0b37765989410065f"
+# (same step is in Dockerfile)

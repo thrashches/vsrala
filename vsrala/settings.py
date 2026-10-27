@@ -67,12 +67,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_celery_beat',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'drf_spectacular',
     'profiles.apps.ProfilesConfig',
     'activities.apps.ActivitiesConfig',
     'user_medias.apps.UserMediasConfig',
     'webinterface.apps.WebinterfaceConfig',
     'integrations.apps.IntegrationsConfig',
     'routes.apps.RoutesConfig',
+    'api.apps.ApiConfig',
 ]
 
 MIDDLEWARE = [
@@ -210,3 +214,38 @@ OVERPASS_USER_AGENT = os.environ.get(
     'OVERPASS_USER_AGENT',
     'vsrala/1.0 (route surfaces; https://github.com/null0ff/vsrala)',
 )
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'VSRALA API',
+    'DESCRIPTION': (
+        'REST API сервиса велотренировок. '
+        'Авторизация: получите токен через POST /api/auth/token/ '
+        '(email + password), затем передавайте заголовок '
+        '`Authorization: Token <key>`.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'TAGS': [
+        {'name': 'auth', 'description': 'Токены'},
+        {'name': 'activities', 'description': 'Тренировки'},
+        {'name': 'leaders', 'description': 'Лидеры недели'},
+        {'name': 'people', 'description': 'Люди и подписки'},
+        {'name': 'me', 'description': 'Текущий профиль и интеграции'},
+        {'name': 'routes', 'description': 'Маршруты'},
+    ],
+}
