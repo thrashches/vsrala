@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { activitiesApi, routesApi } from '../api/endpoints'
+import { ButtonSpinner, FormCardSkeleton } from '../components/skeletons'
 import TrackMap from '../components/TrackMap'
 
 export default function RouteFromActivityPage() {
@@ -50,7 +51,7 @@ export default function RouteFromActivityPage() {
     }
   }
 
-  if (!activity && !error) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (!activity && !error) return <FormCardSkeleton fields={4} wide />
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -134,6 +135,7 @@ export default function RouteFromActivityPage() {
           </select>
         </div>
         <button type="submit" className="btn-brand" disabled={busy}>
+          {busy && <ButtonSpinner />}
           {busy ? 'Сохранение…' : 'Создать маршрут'}
         </button>
       </form>

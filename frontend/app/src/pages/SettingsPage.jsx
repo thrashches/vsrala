@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { meApi } from '../api/endpoints'
 import { useAuth } from '../hooks/AuthContext'
 import Avatar from '../components/Avatar'
+import { ButtonSpinner, SettingsSkeleton } from '../components/skeletons'
 
 const zoneInputClass = 'w-20 rounded border border-gray-300 px-2 py-1 text-sm'
 
@@ -241,7 +242,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (!me) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (!me) return <SettingsSkeleton />
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-4 py-10">
@@ -329,6 +330,7 @@ export default function SettingsPage() {
             disabled={busy}
             onClick={(e) => saveProfile(e, true)}
           >
+            {busy && <ButtonSpinner className="h-3 w-3" />}
             Пересчитать зоны
           </button>
           <ZonesEditor
@@ -354,7 +356,8 @@ export default function SettingsPage() {
             </span>
           </label>
           <button type="submit" className="btn-brand w-full" disabled={busy}>
-            Сохранить
+            {busy && <ButtonSpinner />}
+            {busy ? 'Сохранение…' : 'Сохранить'}
           </button>
         </form>
       </section>
@@ -383,7 +386,8 @@ export default function SettingsPage() {
             />
           </div>
           <button type="submit" className="btn-brand w-full" disabled={busy}>
-            Сменить пароль
+            {busy && <ButtonSpinner />}
+            {busy ? 'Сохранение…' : 'Сменить пароль'}
           </button>
         </form>
       </section>
@@ -405,10 +409,16 @@ export default function SettingsPage() {
                   className="btn-ghost text-xs"
                   disabled={busy}
                   onClick={async () => {
-                    await meApi.intervalsDisconnect()
-                    setMe(await meApi.get())
+                    setBusy(true)
+                    try {
+                      await meApi.intervalsDisconnect()
+                      setMe(await meApi.get())
+                    } finally {
+                      setBusy(false)
+                    }
                   }}
                 >
+                  {busy && <ButtonSpinner className="h-3 w-3" />}
                   Отключить
                 </button>
               )}
@@ -423,7 +433,8 @@ export default function SettingsPage() {
                   required
                 />
                 <button type="submit" className="btn-brand" disabled={busy}>
-                  Подключить
+                  {busy && <ButtonSpinner />}
+                  {busy ? 'Подключение…' : 'Подключить'}
                 </button>
               </form>
             )}
@@ -444,11 +455,17 @@ export default function SettingsPage() {
                     className="btn-ghost text-xs"
                     disabled={busy}
                     onClick={async () => {
-                      await meApi.garminSyncZones()
-                      setMe(await meApi.get())
-                      setMsg('Зоны мощности синхронизированы')
+                      setBusy(true)
+                      try {
+                        await meApi.garminSyncZones()
+                        setMe(await meApi.get())
+                        setMsg('Зоны мощности синхронизированы')
+                      } finally {
+                        setBusy(false)
+                      }
                     }}
                   >
+                    {busy && <ButtonSpinner className="h-3 w-3" />}
                     Sync zones
                   </button>
                   <button
@@ -456,10 +473,16 @@ export default function SettingsPage() {
                     className="btn-ghost text-xs"
                     disabled={busy}
                     onClick={async () => {
-                      await meApi.garminDisconnect()
-                      setMe(await meApi.get())
+                      setBusy(true)
+                      try {
+                        await meApi.garminDisconnect()
+                        setMe(await meApi.get())
+                      } finally {
+                        setBusy(false)
+                      }
                     }}
                   >
+                    {busy && <ButtonSpinner className="h-3 w-3" />}
                     Отключить
                   </button>
                 </div>
@@ -475,7 +498,8 @@ export default function SettingsPage() {
                   required
                 />
                 <button type="submit" className="btn-brand" disabled={busy}>
-                  Подключить
+                  {busy && <ButtonSpinner />}
+                  {busy ? 'Подключение…' : 'Подключить'}
                 </button>
               </form>
             )}
@@ -495,7 +519,8 @@ export default function SettingsPage() {
             required
           />
           <button type="submit" className="btn-ghost w-full text-red-600" disabled={busy}>
-            Удалить аккаунт
+            {busy && <ButtonSpinner />}
+            {busy ? 'Удаление…' : 'Удалить аккаунт'}
           </button>
         </form>
       </section>

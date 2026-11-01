@@ -43,9 +43,9 @@ server {
         try_files /index.html =404;
     }
 
-    location = /landing.css {
+    location ~ ^/(landing\.css|hero\.jpg|logo\.svg|logo-mark\.svg|favicon\.svg)$ {
         root /var/www/landing;
-        try_files /landing.css =404;
+        try_files /$uri =404;
     }
 
     # React SPA: deep links + assets

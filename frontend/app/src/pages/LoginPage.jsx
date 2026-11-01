@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { ButtonSpinner } from '../components/skeletons'
 import { useAuth } from '../hooks/AuthContext'
 
 export default function LoginPage() {
@@ -71,6 +72,7 @@ export default function LoginPage() {
             />
           </div>
           <button className="btn-brand w-full" type="submit" disabled={submitting}>
+            {submitting && <ButtonSpinner />}
             {submitting ? 'Вход…' : 'Войти'}
           </button>
         </form>

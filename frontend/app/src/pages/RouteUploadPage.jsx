@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { routesApi } from '../api/endpoints'
+import { ButtonSpinner } from '../components/skeletons'
 
 export default function RouteUploadPage() {
   const navigate = useNavigate()
@@ -90,6 +91,7 @@ export default function RouteUploadPage() {
           </select>
         </div>
         <button type="submit" className="btn-brand" disabled={busy}>
+          {busy && <ButtonSpinner />}
           {busy ? 'Загрузка…' : 'Загрузить'}
         </button>
       </form>

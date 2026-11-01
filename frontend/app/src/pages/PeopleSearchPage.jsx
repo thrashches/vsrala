@@ -2,19 +2,24 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { peopleApi } from '../api/endpoints'
 import Avatar from '../components/Avatar'
+import { ButtonSpinner, PeopleRowSkeleton } from '../components/skeletons'
 
 export default function PeopleSearchPage() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => {
+      setLoading(true)
+      setError('')
       peopleApi
         .search(q)
         .then((data) => setResults(Array.isArray(data) ? data : data.results || []))
         .catch((err) => setError(err.message))
+        .finally(() => setLoading(false))
     }, 250)
     return () => clearTimeout(t)
   }, [q])
@@ -61,31 +66,41 @@ export default function PeopleSearchPage() {
           {error}
         </div>
       )}
-      <ul className="mt-6 space-y-3">
-        {results.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 rounded bg-white p-4 shadow-card">
-            <Link to={`/people/${p.id}/`}>
-              <Avatar person={p} />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <Link to={`/people/${p.id}/`} className="font-semibold hover:text-brand">
-                {p.display_name}
+      {loading && (
+        <ul className="mt-6 space-y-3">
+          <PeopleRowSkeleton withButton />
+          <PeopleRowSkeleton withButton />
+          <PeopleRowSkeleton withButton />
+        </ul>
+      )}
+      {!loading && (
+        <ul className="mt-6 space-y-3">
+          {results.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 rounded bg-white p-4 shadow-card">
+              <Link to={`/people/${p.id}/`}>
+                <Avatar person={p} />
               </Link>
-              {!p.is_public && (
-                <span className="ml-2 text-xs text-ink-muted">закрытый</span>
-              )}
-            </div>
-            <button
-              type="button"
-              className="btn-ghost text-xs"
-              disabled={busyId === p.id || p.request_pending}
-              onClick={() => toggleFollow(p.id)}
-            >
-              {followLabel(p)}
-            </button>
-          </li>
-        ))}
-      </ul>
+              <div className="min-w-0 flex-1">
+                <Link to={`/people/${p.id}/`} className="font-semibold hover:text-brand">
+                  {p.display_name}
+                </Link>
+                {!p.is_public && (
+                  <span className="ml-2 text-xs text-ink-muted">закрытый</span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={busyId === p.id || p.request_pending}
+                onClick={() => toggleFollow(p.id)}
+              >
+                {busyId === p.id && <ButtonSpinner className="h-3 w-3" />}
+                {followLabel(p)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

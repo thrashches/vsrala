@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { peopleApi } from '../api/endpoints'
 import { useAuth } from '../hooks/AuthContext'
 import Avatar from '../components/Avatar'
+import { ButtonSpinner, PeopleRowSkeleton } from '../components/skeletons'
 import { formatDateTime } from '../lib/format'
 
 export default function FollowRequestsPage() {
@@ -10,8 +11,10 @@ export default function FollowRequestsPage() {
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  async function load() {
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true)
     try {
       const data = await peopleApi.requests()
       const list = Array.isArray(data) ? data : data.results || []
@@ -19,6 +22,8 @@ export default function FollowRequestsPage() {
       setPendingRequests(list.length)
     } catch (err) {
       setError(err.message)
+    } finally {
+      if (!silent) setLoading(false)
     }
   }
 
@@ -31,7 +36,7 @@ export default function FollowRequestsPage() {
     try {
       if (action === 'accept') await peopleApi.accept(id)
       else await peopleApi.reject(id)
-      await load()
+      await load({ silent: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -47,40 +52,51 @@ export default function FollowRequestsPage() {
           {error}
         </div>
       )}
-      {!items.length && (
+      {loading && (
+        <ul className="mt-6 space-y-3">
+          <PeopleRowSkeleton withActions />
+          <PeopleRowSkeleton withActions />
+          <PeopleRowSkeleton withActions />
+        </ul>
+      )}
+      {!loading && !items.length && (
         <p className="mt-6 text-sm text-ink-muted">Нет входящих запросов</p>
       )}
-      <ul className="mt-6 space-y-3">
-        {items.map((r) => (
-          <li key={r.id} className="flex items-center gap-3 rounded bg-white p-4 shadow-card">
-            <Link to={`/people/${r.from_user.id}/`}>
-              <Avatar person={r.from_user} />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <Link to={`/people/${r.from_user.id}/`} className="font-semibold hover:text-brand">
-                {r.from_user.display_name}
+      {!loading && (
+        <ul className="mt-6 space-y-3">
+          {items.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 rounded bg-white p-4 shadow-card">
+              <Link to={`/people/${r.from_user.id}/`}>
+                <Avatar person={r.from_user} />
               </Link>
-              <div className="text-xs text-ink-muted">{formatDateTime(r.created_at)}</div>
-            </div>
-            <button
-              type="button"
-              className="btn-brand text-xs"
-              disabled={busyId === r.id}
-              onClick={() => act(r.id, 'accept')}
-            >
-              Принять
-            </button>
-            <button
-              type="button"
-              className="btn-ghost text-xs"
-              disabled={busyId === r.id}
-              onClick={() => act(r.id, 'reject')}
-            >
-              Отклонить
-            </button>
-          </li>
-        ))}
-      </ul>
+              <div className="min-w-0 flex-1">
+                <Link to={`/people/${r.from_user.id}/`} className="font-semibold hover:text-brand">
+                  {r.from_user.display_name}
+                </Link>
+                <div className="text-xs text-ink-muted">{formatDateTime(r.created_at)}</div>
+              </div>
+              <button
+                type="button"
+                className="btn-brand text-xs"
+                disabled={busyId === r.id}
+                onClick={() => act(r.id, 'accept')}
+              >
+                {busyId === r.id && <ButtonSpinner className="h-3 w-3" />}
+                Принять
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-xs"
+                disabled={busyId === r.id}
+                onClick={() => act(r.id, 'reject')}
+              >
+                {busyId === r.id && <ButtonSpinner className="h-3 w-3" />}
+                Отклонить
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
