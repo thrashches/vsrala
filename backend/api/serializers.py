@@ -198,6 +198,7 @@ class ActivityDetailSerializer(ActivityListSerializer):
     hr_zones_configured = serializers.SerializerMethodField()
     power_zones_configured = serializers.SerializerMethodField()
     reaction_choices = serializers.SerializerMethodField()
+    has_track_file = serializers.SerializerMethodField()
 
     class Meta(ActivityListSerializer.Meta):
         fields = ActivityListSerializer.Meta.fields + (
@@ -207,7 +208,7 @@ class ActivityDetailSerializer(ActivityListSerializer):
             'hr_zones_configured', 'power_zones_configured',
             'aerobic_training_effect', 'anaerobic_training_effect',
             'avg_temperature', 'vo2max', 'external_id', 'external_refs',
-            'reaction_choices',
+            'reaction_choices', 'has_track_file',
         )
 
     def get_zone_timeline_url(self, obj):
@@ -253,6 +254,9 @@ class ActivityDetailSerializer(ActivityListSerializer):
 
     def get_reaction_choices(self, obj):
         return [{'emoji': e, 'label': l} for e, l in ActivityReaction.EMOJI_CHOICES]
+
+    def get_has_track_file(self, obj):
+        return bool(obj.track_file)
 
 
 class ActivityUploadSerializer(serializers.Serializer):
