@@ -8,6 +8,7 @@ node_modules
 __pycache__
 *.jpg
 *.png
+!frontend/landing/hero.jpg
 db.sqlite3
 chromedriver
 geckodriver
