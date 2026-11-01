@@ -16,11 +16,19 @@
 
 @layer components {
   .btn-brand {
-    @apply inline-flex items-center justify-center rounded bg-brand px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-dark disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded bg-brand px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-dark disabled:opacity-50;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-gray-50 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-gray-50 disabled:opacity-50;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-gray-200;
+  }
+
+  .btn-spinner {
+    @apply h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
   }
 
   .stat-label {

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { peopleApi } from '../api/endpoints'
 import ActivityCard from '../components/ActivityCard'
 import Avatar from '../components/Avatar'
+import { ButtonSpinner, ProfileSkeleton } from '../components/skeletons'
 
 export default function ProfilePage() {
   const { id } = useParams()
@@ -39,7 +40,7 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-red-700">{error}</div>
     )
   }
-  if (!profile) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (!profile) return <ProfileSkeleton />
 
   const followLabel = profile.is_following
     ? 'Отписаться'
@@ -74,6 +75,7 @@ export default function ProfilePage() {
                 disabled={busy || profile.request_pending}
                 onClick={toggleFollow}
               >
+                {busy && <ButtonSpinner />}
                 {followLabel}
               </button>
             )}

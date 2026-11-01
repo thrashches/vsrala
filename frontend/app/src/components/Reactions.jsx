@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { activitiesApi } from '../api/endpoints'
+import { ButtonSpinner } from './skeletons'
 
 const DEFAULT_CHOICES = [
   { emoji: '👍', label: 'Лайк' },
@@ -19,6 +20,7 @@ export default function Reactions({
 }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [busyEmoji, setBusyEmoji] = useState(null)
   const wrapRef = useRef(null)
   const options = choices?.length ? choices : DEFAULT_CHOICES
 
@@ -40,12 +42,14 @@ export default function Reactions({
   async function toggle(emoji) {
     if (busy) return
     setBusy(true)
+    setBusyEmoji(emoji)
     try {
       const data = await activitiesApi.react(activityId, emoji)
       onChange?.(data)
       setOpen(false)
     } finally {
       setBusy(false)
+      setBusyEmoji(null)
     }
   }
 
@@ -61,7 +65,11 @@ export default function Reactions({
             disabled={busy}
             aria-pressed={mine === c.emoji}
           >
-            <span>{c.emoji}</span>
+            {busyEmoji === c.emoji ? (
+              <ButtonSpinner className="h-3 w-3" />
+            ) : (
+              <span>{c.emoji}</span>
+            )}
             <span className="text-xs font-semibold text-ink-muted">{c.count}</span>
           </button>
         ))}
@@ -70,16 +78,21 @@ export default function Reactions({
         <div ref={wrapRef} className="relative z-[1100]">
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-ink-muted transition hover:border-brand hover:bg-gray-50 hover:text-brand"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-ink-muted transition hover:border-brand hover:bg-gray-50 hover:text-brand disabled:opacity-50"
             onClick={() => setOpen((v) => !v)}
+            disabled={busy}
             aria-expanded={open}
             aria-haspopup="true"
             aria-label="Добавить реакцию"
             title="Реакция"
           >
-            <span className="material-icons text-base leading-none" aria-hidden="true">
-              thumb_up
-            </span>
+            {busy && !busyEmoji ? (
+              <ButtonSpinner className="h-3.5 w-3.5" />
+            ) : (
+              <span className="material-icons text-base leading-none" aria-hidden="true">
+                thumb_up
+              </span>
+            )}
           </button>
           {open && (
             <div className="absolute bottom-full left-0 z-[1100] mb-2 flex gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-card">
@@ -89,11 +102,11 @@ export default function Reactions({
                   type="button"
                   title={c.label}
                   aria-label={c.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none transition hover:bg-gray-100"
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none transition hover:bg-gray-100 disabled:opacity-50"
                   onClick={() => toggle(c.emoji)}
                   disabled={busy}
                 >
-                  {c.emoji}
+                  {busyEmoji === c.emoji ? <ButtonSpinner className="h-3.5 w-3.5" /> : c.emoji}
                 </button>
               ))}
             </div>

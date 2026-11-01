@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { routesApi } from '../api/endpoints'
+import { RouteTileSkeleton } from '../components/skeletons'
 
 const TABS = [
   { id: 'mine', label: 'Мои' },
@@ -50,29 +51,38 @@ export default function RoutesListPage() {
           {error}
         </div>
       )}
-      {loading && <p className="mt-6 text-sm text-ink-muted">Загрузка…</p>}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {routes.map((r) => (
-          <Link
-            key={r.id}
-            to={`/routes/${r.id}/`}
-            className="overflow-hidden rounded bg-white shadow-card transition hover:shadow-md"
-          >
-            {r.map_preview_url ? (
-              <img src={r.map_preview_url} alt="" className="h-40 w-full object-cover" />
-            ) : (
-              <div className="flex h-40 items-center justify-center bg-feed text-ink-muted">Нет превью</div>
-            )}
-            <div className="p-4">
-              <h2 className="font-bold text-ink">{r.title}</h2>
-              <p className="mt-1 text-xs text-ink-muted">
-                {r.distance != null ? `${r.distance} км` : '—'}
-                {r.elevation_gain != null ? ` · ↑ ${r.elevation_gain} м` : ''}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {loading && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <RouteTileSkeleton />
+          <RouteTileSkeleton />
+          <RouteTileSkeleton />
+          <RouteTileSkeleton />
+        </div>
+      )}
+      {!loading && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {routes.map((r) => (
+            <Link
+              key={r.id}
+              to={`/routes/${r.id}/`}
+              className="overflow-hidden rounded bg-white shadow-card transition hover:shadow-md"
+            >
+              {r.map_preview_url ? (
+                <img src={r.map_preview_url} alt="" className="h-40 w-full object-cover" />
+              ) : (
+                <div className="flex h-40 items-center justify-center bg-feed text-ink-muted">Нет превью</div>
+              )}
+              <div className="p-4">
+                <h2 className="font-bold text-ink">{r.title}</h2>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {r.distance != null ? `${r.distance} км` : '—'}
+                  {r.elevation_gain != null ? ` · ↑ ${r.elevation_gain} м` : ''}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
       {!loading && !routes.length && (
         <p className="mt-6 text-sm text-ink-muted">Маршрутов пока нет</p>
       )}

@@ -5,6 +5,7 @@ import ActivityCharts from '../components/ActivityCharts'
 import ActivitySource from '../components/ActivitySource'
 import Avatar from '../components/Avatar'
 import Reactions from '../components/Reactions'
+import { ActivityDetailSkeleton, ButtonSpinner } from '../components/skeletons'
 import TrackMap from '../components/TrackMap'
 import { formatDateTime, parseDurationSec } from '../lib/format'
 
@@ -284,7 +285,7 @@ export default function ActivityDetailPage() {
     }
   }
 
-  if (loading) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (loading) return <ActivityDetailSkeleton />
   if (error && !activity) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6">
@@ -645,10 +646,11 @@ export default function ActivityDetailPage() {
                   {c.can_delete && (
                     <button
                       type="button"
-                      className="mt-1 text-xs text-red-600"
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-red-600 disabled:opacity-50"
                       disabled={busy}
                       onClick={() => deleteComment(c.id)}
                     >
+                      {busy && <ButtonSpinner className="h-3 w-3" />}
                       Удалить
                     </button>
                   )}
@@ -665,7 +667,8 @@ export default function ActivityDetailPage() {
               onChange={(e) => setCommentText(e.target.value)}
             />
             <button type="submit" className="btn-brand self-end" disabled={busy}>
-              Отправить
+              {busy && <ButtonSpinner />}
+              {busy ? 'Отправка…' : 'Отправить'}
             </button>
           </form>
         </div>

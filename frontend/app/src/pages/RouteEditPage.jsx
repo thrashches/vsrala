@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { routesApi } from '../api/endpoints'
+import { ButtonSpinner, FormCardSkeleton } from '../components/skeletons'
 
 export default function RouteEditPage() {
   const { id } = useParams()
@@ -37,7 +38,7 @@ export default function RouteEditPage() {
     }
   }
 
-  if (loading) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (loading) return <FormCardSkeleton fields={3} />
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
@@ -89,7 +90,8 @@ export default function RouteEditPage() {
         </div>
         <div className="flex gap-2">
           <button type="submit" className="btn-brand" disabled={busy}>
-            Сохранить
+            {busy && <ButtonSpinner />}
+            {busy ? 'Сохранение…' : 'Сохранить'}
           </button>
           <button type="button" className="btn-ghost" onClick={() => navigate(-1)}>
             Отмена

@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { routesApi } from '../api/endpoints'
 import Avatar from '../components/Avatar'
+import {
+  ButtonSpinner,
+  RouteDetailSkeleton,
+  SurfaceCoverageSkeleton,
+} from '../components/skeletons'
 import TrackMap, { SURFACE_COLORS } from '../components/TrackMap'
 import { formatDate } from '../lib/format'
 
@@ -44,7 +49,7 @@ function SurfaceCoverage({ status, summary }) {
     )
   }
   if (status === 'pending') {
-    return <p className="text-sm text-ink-muted">Определяем тип покрытия…</p>
+    return <SurfaceCoverageSkeleton />
   }
   if (status === 'failed') {
     return <p className="text-sm text-ink-muted">Покрытие недоступно</p>
@@ -57,6 +62,8 @@ export default function RouteDetailPage() {
   const navigate = useNavigate()
   const [route, setRoute] = useState(null)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState('')
 
   useEffect(() => {
     routesApi
@@ -67,25 +74,42 @@ export default function RouteDetailPage() {
 
   async function handleDelete() {
     if (!window.confirm('Удалить маршрут?')) return
-    await routesApi.remove(id)
-    navigate('/routes/')
+    setBusy(true)
+    setBusyAction('delete')
+    try {
+      await routesApi.remove(id)
+      navigate('/routes/')
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+      setBusyAction('')
+    }
   }
 
   async function downloadGpx() {
-    const res = await routesApi.gpx(id)
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${route?.title || 'route'}.gpx`
-    a.click()
-    URL.revokeObjectURL(url)
+    setBusy(true)
+    setBusyAction('gpx')
+    try {
+      const res = await routesApi.gpx(id)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${route?.title || 'route'}.gpx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+      setBusyAction('')
+    }
   }
 
   if (error && !route) {
     return <div className="p-6 text-sm text-red-700">{error}</div>
   }
-  if (!route) return <p className="p-6 text-sm text-ink-muted">Загрузка…</p>
+  if (!route) return <RouteDetailSkeleton />
 
   const visibilityLabel =
     route.visibility_label || VISIBILITY_LABELS[route.visibility] || route.visibility
@@ -117,9 +141,11 @@ export default function RouteDetailPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50"
+                className="inline-flex items-center gap-2 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
                 onClick={downloadGpx}
+                disabled={busy}
               >
+                {busyAction === 'gpx' && <ButtonSpinner className="h-3.5 w-3.5" />}
                 Скачать GPX
               </button>
               {route.is_owner && (
@@ -132,9 +158,11 @@ export default function RouteDetailPage() {
                   </Link>
                   <button
                     type="button"
-                    className="rounded border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    className="inline-flex items-center gap-2 rounded border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
                     onClick={handleDelete}
+                    disabled={busy}
                   >
+                    {busyAction === 'delete' && <ButtonSpinner className="h-3.5 w-3.5" />}
                     Удалить
                   </button>
                 </>

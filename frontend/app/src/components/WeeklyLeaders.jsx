@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { leadersApi } from '../api/endpoints'
 import Avatar from './Avatar'
+import { LeaderRowSkeleton } from './skeletons'
 
 const METRICS = [
   { id: 'distance', label: 'Дистанция' },
@@ -74,11 +75,20 @@ export default function WeeklyLeaders() {
         ))}
       </div>
       <div className="mt-4 space-y-3">
-        {loading && <p className="text-xs text-ink-muted">Загрузка…</p>}
+        {loading && (
+          <>
+            <LeaderRowSkeleton />
+            <LeaderRowSkeleton />
+            <LeaderRowSkeleton />
+            <LeaderRowSkeleton />
+            <LeaderRowSkeleton />
+          </>
+        )}
         {!loading && !rows.length && (
           <p className="text-xs text-ink-muted">Пока нет данных</p>
         )}
-        {rows.map((row) => {
+        {!loading &&
+          rows.map((row) => {
           const person = {
             id: row.profile_id,
             display_name: row.display_name,

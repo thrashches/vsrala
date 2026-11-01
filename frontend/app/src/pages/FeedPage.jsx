@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { activitiesApi } from '../api/endpoints'
 import ActivityCard from '../components/ActivityCard'
+import { ActivityCardSkeleton } from '../components/skeletons'
 import WeeklyLeaders from '../components/WeeklyLeaders'
 
 export default function FeedPage({ scope = 'feed' }) {
@@ -53,10 +54,16 @@ export default function FeedPage({ scope = 'feed' }) {
       </div>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 lg:max-w-2xl">
-          {loading && <p className="text-sm text-ink-muted">Загрузка…</p>}
           {error && (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
+            </div>
+          )}
+          {loading && (
+            <div className="space-y-4">
+              <ActivityCardSkeleton />
+              <ActivityCardSkeleton />
+              <ActivityCardSkeleton />
             </div>
           )}
           {!loading && !activities.length && !error && (
@@ -66,15 +73,17 @@ export default function FeedPage({ scope = 'feed' }) {
               </p>
             </div>
           )}
-          <div className="space-y-4">
-            {activities.map((activity) => (
-              <ActivityCard
-                key={activity.id}
-                activity={activity}
-                onReactionChange={(patch) => patchActivity(activity.id, patch)}
-              />
-            ))}
-          </div>
+          {!loading && (
+            <div className="space-y-4">
+              {activities.map((activity) => (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  onReactionChange={(patch) => patchActivity(activity.id, patch)}
+                />
+              ))}
+            </div>
+          )}
           {data && (data.next || data.previous) && (
             <div className="mt-6 flex justify-center gap-2">
               <button
