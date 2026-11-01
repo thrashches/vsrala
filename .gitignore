@@ -1,5 +1,6 @@
 venv
 .venv
+.venv313
 node_modules
 *.pyc
 .idea
@@ -13,11 +14,19 @@ geckodriver
 *.log
 
 # Uploaded activity files (Django MEDIA_ROOT)
+backend/media/
 media/
+
+# Django collectstatic
+backend/staticfiles/
+staticfiles/
+
+# Frontend build output
+frontend/app/dist/
 
 # Activity track files outside fixtures
 *.gpx
 *.fit
-!activities/tests/fixtures/*.gpx
-!activities/tests/fixtures/*.fit
+!backend/activities/tests/fixtures/*.gpx
+!backend/activities/tests/fixtures/*.fit
 .env

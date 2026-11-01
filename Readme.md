@@ -2,16 +2,33 @@
 
 Сервис для велотренировок (аналог Strava): загрузка GPX/FIT, карта трека, лента активности.
 
-## Docker Compose
+## Структура репозитория
 
-Полный стек: nginx, backend (Django), PostgreSQL, Redis, Celery (worker + beat).
+```
+backend/          # Django: API, admin, Celery
+frontend/
+  app/            # React SPA (Vite)
+  landing/        # статический SEO-лендинг
+nginx/            # reverse proxy / TLS
+docker-compose.yml
+scripts/          # Let's Encrypt helpers
+```
+
+## Архитектура
+
+- **Лендинг** (`/`) — статическая HTML-страница (SEO)
+- **Приложение** — React SPA: `/feed/`, `/activities/…`, `/people/…`, `/routes/…`, `/settings/`, `/login/`
+- **Backend** — Django: `/api/`, `/admin/`, media/static
+- **nginx** — маршрутизация, TLS, раздача SPA/landing
+
+## Docker Compose
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Открыть: http://localhost
+Открыть: http://localhost — лендинг; приложение: http://localhost/feed/
 
 Создать пользователя:
 
@@ -49,6 +66,7 @@ cp .env.example .env
 DOMAIN=your-domain.example
 CERTBOT_EMAIL=you@example.com
 ENABLE_SSL=0
+ENABLE_LEGACY_UI=0
 
 DEBUG=0
 SECRET_KEY=<длинная-случайная-строка>
@@ -110,64 +128,52 @@ git pull
 docker compose up -d --build
 ```
 
-Создать суперпользователя:
+## Запуск для разработки (без полного Docker UI)
+
+### Backend
 
 ```bash
-docker compose exec backend python manage.py createsuperuser
-```
-
-## Запуск dev-сервера (без Docker)
-
-Создаём venv (Python 3.9+):
-
-```bash
+cd backend
 python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-```
-
-Сборка CSS (Tailwind):
-
-```bash
-npm install
-npm run build:css
-```
-
-Для разработки стилей: `npm run watch:css`.
-
-Redis (брокер Celery):
-
-```bash
-docker compose up -d redis
-```
-
-Миграции и сервер:
-
-```bash
+cd ..
+docker compose up -d database redis
+cd backend
 python manage.py migrate
 python manage.py runserver
 ```
 
-В отдельных терминалах — worker и beat для синхронизации Intervals.icu:
+API: http://127.0.0.1:8000/api/  
+По умолчанию `ENABLE_LEGACY_UI=1` — старые Django-шаблоны доступны с runserver (для тестов).
+
+### Frontend (React SPA)
 
 ```bash
+cd frontend/app
+npm install   # Node ≥ 20
+npm run dev
+```
+
+Vite: http://127.0.0.1:5173 — проксирует `/api` и `/media` на Django `:8000`.
+
+Или из корня: `npm run dev:app`.
+
+### Celery
+
+```bash
+cd backend
 celery -A vsrala worker -l info
 celery -A vsrala beat -l info
 ```
 
-Тесты:
+### Тесты
 
 ```bash
+cd backend
 python manage.py test -v2
 ```
 
-Создать пользователя:
+После входа в SPA: **Загрузить** → файл `.gpx` или `.fit`.
 
-```bash
-python manage.py createsuperuser
-```
-
-После входа: **Загрузить** → файл `.gpx` или `.fit`.
-
-Подключение Intervals.icu: **Настройки** → API-ключ из Developer Settings на intervals.icu.
-При первом подключении скачиваются тренировки за последние 6 месяцев; далее — каждые 15 минут проверяются новые.
+Подключение Intervals.icu / Garmin: **Настройки** в приложении.

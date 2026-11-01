@@ -1,4 +1,12 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+    volumes:
+      - spa_data:/out/spa
+      - landing_data:/out/landing
+    restart: "no"
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -13,11 +21,16 @@ services:
       - ./nginx/entrypoint.sh:/entrypoint.sh:ro
       - static_data:/var/www/static:ro
       - media_data:/var/www/media:ro
+      - spa_data:/var/www/spa:ro
+      - landing_data:/var/www/landing:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     depends_on:
-      - backend
+      frontend:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   certbot:
@@ -60,7 +73,8 @@ services:
     restart: unless-stopped
 
   backend:
-    build: .
+    build:
+      context: ./backend
     env_file: .env
     volumes:
       - media_data:/app/media
@@ -74,7 +88,8 @@ services:
     restart: unless-stopped
 
   celery:
-    build: .
+    build:
+      context: ./backend
     env_file: .env
     volumes:
       - media_data:/app/media
@@ -102,5 +117,7 @@ volumes:
   redis_data:
   media_data:
   static_data:
+  spa_data:
+  landing_data:
   certbot_www:
   certbot_certs:

@@ -2,10 +2,7 @@
   "name": "vsrala",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i ./webinterface/static/css/input.css -o ./webinterface/static/css/app.css --minify",
-    "watch:css": "tailwindcss -i ./webinterface/static/css/input.css -o ./webinterface/static/css/app.css --watch"
-  },
-  "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "dev:app": "npm --prefix frontend/app run dev",
+    "build:app": "npm --prefix frontend/app run build"
   }
 }

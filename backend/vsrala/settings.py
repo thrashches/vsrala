@@ -155,11 +155,14 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = 'profiles.Profile'
 
-LOGIN_URL = 'webinterface:login'
+# SPA routes (nginx). Named webinterface URLs remain only if ENABLE_LEGACY_UI=1.
+LOGIN_URL = '/login/'
+LOGOUT_REDIRECT_URL = '/login/'
+LOGIN_REDIRECT_URL = '/feed/'
 
-LOGOUT_REDIRECT_URL = 'webinterface:login'
-
-LOGIN_REDIRECT_URL = 'webinterface:feed'
+# Serve Django template UI under the same paths (for tests / local without nginx).
+# In Docker + nginx production set ENABLE_LEGACY_UI=0 — SPA owns those routes.
+ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', '1') == '1'
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
