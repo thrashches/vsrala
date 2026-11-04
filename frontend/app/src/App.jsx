@@ -30,6 +30,8 @@ export default function App() {
             <Route path="/activities/:id/" element={<ActivityDetailPage />} />
             <Route path="/activities/:id/edit/" element={<ActivityEditPage />} />
             <Route path="/people/" element={<PeopleSearchPage />} />
+            <Route path="/people/following/" element={<PeopleListPage mode="following" />} />
+            <Route path="/people/followers/" element={<PeopleListPage mode="followers" />} />
             <Route path="/people/requests/" element={<FollowRequestsPage />} />
             <Route path="/people/:id/" element={<ProfilePage />} />
             <Route path="/people/:id/following/" element={<PeopleListPage mode="following" />} />

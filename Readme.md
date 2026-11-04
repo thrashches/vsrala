@@ -147,6 +147,8 @@ python manage.py runserver
 API: http://127.0.0.1:8000/api/  
 По умолчанию `ENABLE_LEGACY_UI=1` — старые Django-шаблоны доступны с runserver (для тестов).
 
+В Docker backend слушает через **gunicorn** (`vsrala.wsgi`), не через `runserver`.
+
 ### Frontend (React SPA)
 
 ```bash

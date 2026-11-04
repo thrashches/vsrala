@@ -60,6 +60,11 @@ urlpatterns = [
         views.ProfileFollowToggleView.as_view(),
         name='api_profile_follow',
     ),
+    path(
+        'people/<int:pk>/remove-follower/',
+        views.ProfileRemoveFollowerView.as_view(),
+        name='api_profile_remove_follower',
+    ),
 
     path('me/', views.MeView.as_view(), name='api_me'),
     path('me/password/', views.MePasswordView.as_view(), name='api_me_password'),

@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from activities.models import Activity, ActivityType
-from profiles.models import FollowRequest, Profile
+from profiles.models import Follow, FollowRequest, Profile
 from routes.models import Route
 
 
@@ -151,6 +151,12 @@ class ApiPeopleMeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
 
+    def test_people_search_default_newest(self):
+        response = self.client.get('/api/people/search/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['id'], self.other.pk)
+
     def test_follow_toggle(self):
         response = self.client.post(f'/api/people/{self.other.pk}/follow/')
         self.assertEqual(response.status_code, 200)
@@ -166,6 +172,19 @@ class ApiPeopleMeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(FollowRequest.objects.filter(pk=req.pk).exists())
         self.assertTrue(self.other.follows.filter(pk=self.user.pk).exists())
+
+    def test_remove_follower(self):
+        Follow.objects.create(user=self.other, following=self.user)
+        response = self.client.post(f'/api/people/{self.other.pk}/remove-follower/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'removed')
+        self.assertFalse(
+            Follow.objects.filter(user=self.other, following=self.user).exists(),
+        )
+
+    def test_remove_follower_not_found(self):
+        response = self.client.post(f'/api/people/{self.other.pk}/remove-follower/')
+        self.assertEqual(response.status_code, 404)
 
     def test_password_change(self):
         response = self.client.post('/api/me/password/', {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { peopleApi } from '../api/endpoints'
 import Avatar from '../components/Avatar'
+import PeopleSectionNav from '../components/PeopleSectionNav'
 import { ButtonSpinner, PeopleRowSkeleton } from '../components/skeletons'
 
 export default function PeopleSearchPage() {
@@ -55,6 +56,7 @@ export default function PeopleSearchPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
       <h1 className="text-xl font-bold text-ink">Люди</h1>
+      <PeopleSectionNav />
       <input
         className="field-input mt-4"
         placeholder="Поиск по имени или email…"

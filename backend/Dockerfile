@@ -26,4 +26,4 @@ COPY . .
 RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "vsrala.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]

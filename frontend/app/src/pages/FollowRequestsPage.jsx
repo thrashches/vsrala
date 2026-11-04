@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { peopleApi } from '../api/endpoints'
 import { useAuth } from '../hooks/AuthContext'
 import Avatar from '../components/Avatar'
+import PeopleSectionNav from '../components/PeopleSectionNav'
 import { ButtonSpinner, PeopleRowSkeleton } from '../components/skeletons'
 import { formatDateTime } from '../lib/format'
 
@@ -47,6 +48,7 @@ export default function FollowRequestsPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
       <h1 className="text-xl font-bold text-ink">Запросы на подписку</h1>
+      <PeopleSectionNav />
       {error && (
         <div className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}

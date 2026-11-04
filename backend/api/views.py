@@ -69,10 +69,11 @@ from integrations.intervals_client import IntervalsApiError
 from integrations.models import GarminConnection
 from integrations.sync import connect_profile, disconnect_profile
 from integrations.tasks import sync_connection, sync_garmin_connection
-from profiles.models import FollowRequest, Profile
+from profiles.models import Follow, FollowRequest, Profile
 from profiles.services import (
     accept_follow_request,
     reject_follow_request,
+    remove_follower,
     toggle_follow,
 )
 from profiles.zones import resolve_hr_zones, resolve_power_zones
@@ -420,21 +421,20 @@ class WeeklyLeadersView(APIView):
 class PeopleSearchView(APIView):
     @extend_schema(
         tags=['people'],
-        parameters=[OpenApiParameter('q', OpenApiTypes.STR, required=True)],
+        parameters=[OpenApiParameter('q', OpenApiTypes.STR, required=False)],
         responses={200: ProfileSearchSerializer(many=True)},
         summary='Поиск людей',
     )
     def get(self, request):
         q = (request.query_params.get('q') or '').strip()
-        if not q:
-            return Response({'results': []})
-        profiles = list(
-            Profile.objects.filter(
-                Q(first_name__icontains=q) | Q(email__icontains=q)
+        qs = Profile.objects.exclude(pk=request.user.pk)
+        if q:
+            profiles = list(
+                qs.filter(Q(first_name__icontains=q) | Q(email__icontains=q))
+                .order_by('first_name', 'email')[:20]
             )
-            .exclude(pk=request.user.pk)
-            .order_by('first_name', 'email')[:20]
-        )
+        else:
+            profiles = list(qs.order_by('-date_joined', '-pk')[:20])
         _annotate_following(request.user, profiles)
         return Response({
             'results': ProfileSearchSerializer(profiles, many=True).data,
@@ -540,6 +540,25 @@ class ProfileFollowToggleView(APIView):
             'request_pending': result.request_pending,
             'followers_count': result.followers_count,
         })
+
+
+class ProfileRemoveFollowerView(APIView):
+    @extend_schema(
+        tags=['people'],
+        request=None,
+        responses={200: StatusSerializer},
+        summary='Удалить подписчика',
+    )
+    def post(self, request, pk):
+        follower = get_object_or_404(Profile, pk=pk)
+        try:
+            remove_follower(owner=request.user, follower=follower)
+        except DjangoValidationError as exc:
+            message = '; '.join(exc.messages) if hasattr(exc, 'messages') else str(exc)
+            raise ValidationError(message) from exc
+        except Follow.DoesNotExist:
+            raise NotFound('Подписчик не найден') from None
+        return Response({'status': 'removed'})
 
 
 class FollowRequestListView(generics.ListAPIView):

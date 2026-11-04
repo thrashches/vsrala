@@ -49,6 +49,7 @@ export const peopleApi = {
   following: (id) => api(`/people/${id}/following/`),
   followers: (id) => api(`/people/${id}/followers/`),
   follow: (id) => api(`/people/${id}/follow/`, { method: 'POST' }),
+  removeFollower: (id) => api(`/people/${id}/remove-follower/`, { method: 'POST' }),
 }
 
 export const meApi = {

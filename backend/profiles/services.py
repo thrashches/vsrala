@@ -58,3 +58,13 @@ def accept_follow_request(*, follow_request: FollowRequest) -> None:
 
 def reject_follow_request(*, follow_request: FollowRequest) -> None:
     follow_request.delete()
+
+
+def remove_follower(*, owner: Profile, follower: Profile) -> None:
+    """Remove a follower from the owner's followers list."""
+    if follower.pk == owner.pk:
+        raise ValidationError('Нельзя удалить себя из подписчиков')
+
+    deleted, _ = Follow.objects.filter(user=follower, following=owner).delete()
+    if not deleted:
+        raise Follow.DoesNotExist
