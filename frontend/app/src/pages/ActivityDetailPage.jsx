@@ -341,18 +341,90 @@ export default function ActivityDetailPage() {
               {activity.description && (
                 <p className="mt-2 text-sm text-ink-muted">{activity.description}</p>
               )}
-              {activity.is_owner && activity.track_points?.length > 0 && (
-                <Link
-                  to={`/routes/from-activity/${activity.id}/`}
-                  className="mt-3 inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-gray-50"
-                >
-                  <span className="material-icons text-[18px] leading-none" aria-hidden="true">
-                    route
-                  </span>
-                  Сохранить как маршрут
-                </Link>
-              )}
             </div>
+            {activity.is_owner && (
+              <div ref={menuRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  className="rounded p-1.5 text-ink-muted hover:bg-gray-100 hover:text-ink"
+                  aria-expanded={menuOpen}
+                  aria-haspopup="true"
+                  aria-label="Действия с тренировкой"
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  <span className="material-icons text-[22px] leading-none" aria-hidden="true">
+                    more_vert
+                  </span>
+                </button>
+                {menuOpen && (
+                  <div
+                    className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded border border-gray-200 bg-white py-1 shadow-card"
+                    role="menu"
+                  >
+                    {activity.has_track_file && (
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-ink hover:bg-gray-50"
+                        role="menuitem"
+                        onClick={handleDownloadFit}
+                      >
+                        <span
+                          className="material-icons text-[18px] leading-none text-ink-muted"
+                          aria-hidden="true"
+                        >
+                          download
+                        </span>
+                        Скачать .fit
+                      </button>
+                    )}
+                    {activity.track_points?.length > 0 && (
+                      <Link
+                        to={`/routes/from-activity/${activity.id}/`}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                        role="menuitem"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <span
+                          className="material-icons text-[18px] leading-none text-ink-muted"
+                          aria-hidden="true"
+                        >
+                          route
+                        </span>
+                        Сохранить как маршрут
+                      </Link>
+                    )}
+                    <Link
+                      to={`/activities/${activity.id}/edit/`}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+                      role="menuitem"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <span
+                        className="material-icons text-[18px] leading-none text-ink-muted"
+                        aria-hidden="true"
+                      >
+                        edit
+                      </span>
+                      Редактировать
+                    </Link>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        handleDelete()
+                      }}
+                    >
+                      <span className="material-icons text-[18px] leading-none" aria-hidden="true">
+                        delete
+                      </span>
+                      Удалить
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -432,73 +504,6 @@ export default function ActivityDetailPage() {
                 )
               })}
             </div>
-            {activity.is_owner && (
-              <div ref={menuRef} className="relative ml-1 flex shrink-0 items-center">
-                <button
-                  type="button"
-                  className="rounded p-1.5 text-ink-muted hover:bg-gray-100 hover:text-ink"
-                  aria-expanded={menuOpen}
-                  aria-haspopup="true"
-                  aria-label="Действия с тренировкой"
-                  onClick={() => setMenuOpen((v) => !v)}
-                >
-                  <span className="material-icons text-[22px] leading-none" aria-hidden="true">
-                    more_vert
-                  </span>
-                </button>
-                {menuOpen && (
-                  <div
-                    className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded border border-gray-200 bg-white py-1 shadow-card"
-                    role="menu"
-                  >
-                    {activity.has_track_file && (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-ink hover:bg-gray-50"
-                        role="menuitem"
-                        onClick={handleDownloadFit}
-                      >
-                        <span
-                          className="material-icons text-[18px] leading-none text-ink-muted"
-                          aria-hidden="true"
-                        >
-                          download
-                        </span>
-                        Скачать .fit
-                      </button>
-                    )}
-                    <Link
-                      to={`/activities/${activity.id}/edit/`}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
-                      role="menuitem"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <span
-                        className="material-icons text-[18px] leading-none text-ink-muted"
-                        aria-hidden="true"
-                      >
-                        edit
-                      </span>
-                      Редактировать
-                    </Link>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                      role="menuitem"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        handleDelete()
-                      }}
-                    >
-                      <span className="material-icons text-[18px] leading-none" aria-hidden="true">
-                        delete
-                      </span>
-                      Удалить
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {tab === 'stats' && (
