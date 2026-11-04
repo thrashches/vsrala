@@ -35,6 +35,18 @@ class BestDistanceEffortsTests(SimpleTestCase):
         self.assertAlmostEqual(rows[0]['speed_kmh'], 36.0, delta=1.0)
         self.assertIn('км/ч', rows[0]['speed_display'])
 
+    def test_pace_display_for_foot_sports(self):
+        # 12 km/h → 1 km in 300 seconds → 5:00 /км
+        n = 400
+        times = list(range(n))
+        speeds = [12.0] * n
+        rows = best_distance_efforts(
+            {'time': times, 'speed': speeds}, targets_km=(1,), use_pace=True,
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertIn('/км', rows[0]['speed_display'])
+        self.assertIn('5:00', rows[0]['speed_display'])
+
     def test_skips_targets_beyond_total(self):
         times = list(range(50))
         speeds = [36.0] * 50  # ~0.5 km
@@ -110,8 +122,26 @@ class BuildBestEffortsTests(SimpleTestCase):
                 'power': [150] * 60 + [250] * 60,
             },
             track_points=[],
+            activity_type=SimpleNamespace(slug='road_cycling'),
         )
         result = build_best_efforts(activity)
         self.assertTrue(result['has_distance_efforts'])
         self.assertTrue(result['has_power_efforts'])
         self.assertEqual(result['distance_efforts'][0]['distance_km'], 1)
+        self.assertFalse(result['use_pace'])
+        self.assertEqual(result['rate_label'], 'Скорость')
+
+    def test_build_running_uses_pace(self):
+        activity = SimpleNamespace(
+            streams={
+                'time': list(range(400)),
+                'speed': [12.0] * 400,
+                'power': [],
+            },
+            track_points=[],
+            activity_type=SimpleNamespace(slug='running'),
+        )
+        result = build_best_efforts(activity)
+        self.assertTrue(result['use_pace'])
+        self.assertEqual(result['rate_label'], 'Темп')
+        self.assertIn('/км', result['distance_efforts'][0]['speed_display'])

@@ -51,8 +51,13 @@
                                 </div>
                                 {% if activity.avg_speed %}
                                 <div>
+                                    {% if activity.uses_pace %}
+                                    <div class="stat-label">Ср. темп</div>
+                                    <div class="text-lg font-bold">{{ activity.avg_pace_display|default:"—" }} <span class="text-xs font-normal text-ink-muted">/км</span></div>
+                                    {% else %}
                                     <div class="stat-label">Ср. скорость</div>
                                     <div class="text-lg font-bold">{{ activity.avg_speed }} <span class="text-xs font-normal text-ink-muted">км/ч</span></div>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
                                 {% if activity.avg_hr %}

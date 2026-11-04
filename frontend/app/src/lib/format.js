@@ -64,3 +64,23 @@ export function sourceIcon(source) {
   if (source === 'intervals') return '/static/img/source-intervals.svg'
   return '/static/img/source-upload.svg'
 }
+
+/** Foot sports (run / walk / ski / hike) prefer pace over speed. */
+export function usesPace(activityOrFlag) {
+  if (typeof activityOrFlag === 'boolean') return activityOrFlag
+  if (activityOrFlag?.uses_pace != null) return Boolean(activityOrFlag.uses_pace)
+  const slug = (activityOrFlag?.activity_type?.slug || activityOrFlag?.slug || '')
+    .toString()
+    .toLowerCase()
+  return slug === 'running' || slug === 'walking' || slug === 'skiing'
+}
+
+/** Format speed (km/h) as pace ``m:ss``. Returns null if speed is too low. */
+export function formatPace(speedKmh) {
+  const speed = Number(speedKmh)
+  if (!Number.isFinite(speed) || speed < 0.5) return null
+  const totalSec = Math.max(0, Math.round(3600 / speed))
+  const minutes = Math.floor(totalSec / 60)
+  const seconds = totalSec % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}

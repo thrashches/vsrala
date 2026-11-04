@@ -8,7 +8,7 @@ import Avatar from '../components/Avatar'
 import Reactions from '../components/Reactions'
 import { ActivityDetailSkeleton, ButtonSpinner } from '../components/skeletons'
 import TrackMap from '../components/TrackMap'
-import { formatDateTime, parseDurationSec } from '../lib/format'
+import { formatDateTime, formatPace, parseDurationSec, usesPace } from '../lib/format'
 
 const TABS = [
   { id: 'stats', label: 'Статистика' },
@@ -113,6 +113,7 @@ function BestEfforts({ bestEfforts }) {
   const powerRows = data?.power_efforts || []
   const hasDistance = data?.has_distance_efforts ?? distanceRows.length > 0
   const hasPower = data?.has_power_efforts ?? powerRows.length > 0
+  const rateLabel = data?.rate_label || (data?.use_pace ? 'Темп' : 'Скорость')
 
   return (
     <div className="space-y-8">
@@ -125,7 +126,7 @@ function BestEfforts({ bestEfforts }) {
                 <tr className="bg-gray-100">
                   <th className="px-2 py-2 text-left font-medium sm:px-3">Дистанция</th>
                   <th className="px-2 py-2 font-medium sm:px-3">Время</th>
-                  <th className="px-2 py-2 font-medium sm:px-3">Скорость</th>
+                  <th className="px-2 py-2 font-medium sm:px-3">{rateLabel}</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,6 +301,10 @@ export default function ActivityDetailPage() {
   const streams = activity.streams || {}
   const hasStreams =
     streams.speed?.length || streams.hr?.length || streams.power?.length || streams.ele?.length
+  const paceMode = usesPace(activity)
+  const avgPace = paceMode ? formatPace(activity.avg_speed) : null
+  const movingPace = paceMode ? formatPace(activity.avg_moving_speed) : null
+  const bestPace = paceMode ? formatPace(activity.max_speed) : null
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -432,8 +437,12 @@ export default function ActivityDetailPage() {
           {[
             ['Расстояние', activity.distance != null ? `${activity.distance}` : null, 'км'],
             ['Время', activity.duration_display, null],
-            ['Ср. скорость', activity.avg_speed, 'км/ч'],
-            ['Макс. скорость', activity.max_speed, 'км/ч'],
+            paceMode
+              ? ['Ср. темп', avgPace, '/км']
+              : ['Ср. скорость', activity.avg_speed, 'км/ч'],
+            paceMode
+              ? ['Лучший темп', bestPace, '/км']
+              : ['Макс. скорость', activity.max_speed, 'км/ч'],
             ['Набор высоты', activity.elevation_gain, 'м'],
             ['Ср. мощность', activity.avg_power, 'Вт'],
             ['TSS', activity.tss, null],
@@ -477,6 +486,7 @@ export default function ActivityDetailPage() {
           <ActivityCharts
             streams={streams}
             durationSec={durationSec}
+            usePace={paceMode}
             onHoverTime={handleHoverTime}
           />
         ) : null}
@@ -538,14 +548,24 @@ export default function ActivityDetailPage() {
                   </StatCard>
                 )}
                 {(activity.avg_speed || activity.avg_moving_speed || activity.max_speed) && (
-                  <StatCard title="Скорость">
-                    <StatRow label="Средняя" value={activity.avg_speed} unit="км/ч" />
-                    <StatRow
-                      label="Средняя в движении"
-                      value={activity.avg_moving_speed}
-                      unit="км/ч"
-                    />
-                    <StatRow label="Максимальная" value={activity.max_speed} unit="км/ч" />
+                  <StatCard title={paceMode ? 'Темп' : 'Скорость'}>
+                    {paceMode ? (
+                      <>
+                        <StatRow label="Средний" value={avgPace} unit="/км" />
+                        <StatRow label="В движении" value={movingPace} unit="/км" />
+                        <StatRow label="Лучший" value={bestPace} unit="/км" />
+                      </>
+                    ) : (
+                      <>
+                        <StatRow label="Средняя" value={activity.avg_speed} unit="км/ч" />
+                        <StatRow
+                          label="Средняя в движении"
+                          value={activity.avg_moving_speed}
+                          unit="км/ч"
+                        />
+                        <StatRow label="Максимальная" value={activity.max_speed} unit="км/ч" />
+                      </>
+                    )}
                   </StatCard>
                 )}
                 {(activity.avg_cadence || activity.max_cadence) && (

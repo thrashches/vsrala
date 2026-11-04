@@ -186,6 +186,30 @@ class Activity(models.Model):
     def duration_active_display(self):
         return self._format_hms(self.duration_active)
 
+    @property
+    def uses_pace(self) -> bool:
+        from activities.activity_types import activity_uses_pace
+
+        return activity_uses_pace(self.activity_type)
+
+    @property
+    def avg_pace_display(self):
+        from activities.pace import format_pace
+
+        return format_pace(self.avg_speed)
+
+    @property
+    def avg_moving_pace_display(self):
+        from activities.pace import format_pace
+
+        return format_pace(self.avg_moving_speed)
+
+    @property
+    def best_pace_display(self):
+        from activities.pace import format_pace
+
+        return format_pace(self.max_speed)
+
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if (self.title == '' or self.title is None) and self.started_at:
             t = self.started_at.time()

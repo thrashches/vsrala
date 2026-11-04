@@ -28,6 +28,14 @@
     return Math.round(v * 10) / 10 === Math.round(v) ? String(Math.round(v)) : String(Math.round(v * 10) / 10);
   }
 
+  function formatPaceMinutes(minPerKm) {
+    if (minPerKm == null || !isFinite(minPerKm) || minPerKm <= 0) return '';
+    var totalSec = Math.max(0, Math.round(minPerKm * 60));
+    var m = Math.floor(totalSec / 60);
+    var s = totalSec % 60;
+    return m + ':' + pad2(s);
+  }
+
   function toPoints(values, times) {
     var out = [];
     var arr = values || [];
@@ -40,16 +48,49 @@
     return out;
   }
 
-  function stats(points) {
-    var maxPt = null;
+  function toPacePoints(speeds, times) {
+    var out = [];
+    var arr = speeds || [];
+    for (var i = 0; i < arr.length; i++) {
+      var kmh = arr[i];
+      if (kmh == null || kmh < 0.5) continue;
+      var pace = 60 / kmh;
+      if (!isFinite(pace) || pace > 45) continue;
+      var x = (times && times[i] != null) ? Number(times[i]) : i;
+      out.push({ x: x, y: pace });
+    }
+    return out;
+  }
+
+  function avgPaceFromSpeeds(speeds) {
+    var sum = 0;
+    var n = 0;
+    var arr = speeds || [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] != null && arr[i] >= 0.5) {
+        sum += arr[i];
+        n += 1;
+      }
+    }
+    if (!n) return null;
+    return 60 / (sum / n);
+  }
+
+  function stats(points, peakMode) {
+    peakMode = peakMode || 'max';
+    var peakPt = null;
     var sum = 0;
     for (var i = 0; i < points.length; i++) {
       var p = points[i];
       sum += p.y;
-      if (!maxPt || p.y > maxPt.y) maxPt = p;
+      if (!peakPt) {
+        peakPt = p;
+        continue;
+      }
+      if (peakMode === 'min' ? p.y < peakPt.y : p.y > peakPt.y) peakPt = p;
     }
     return {
-      max: maxPt,
+      peak: peakPt,
       avg: points.length ? sum / points.length : 0,
     };
   }
@@ -168,11 +209,12 @@
       var avg = opts.avg;
       var color = opts.color || '#333';
       var series = opts.series || ((chart.data.datasets[0] && chart.data.datasets[0].data) || []);
+      var formatY = opts.formatY || formatValue;
 
       if (avg != null) {
         var avgY = yScale.getPixelForValue(avg);
         if (avgY >= area.top && avgY <= area.bottom) {
-          var avgLabel = 'ср. ' + formatValue(avg);
+          var avgLabel = 'ср. ' + formatY(avg);
           ctx.save();
           ctx.font = '11px system-ui, sans-serif';
           ctx.fillStyle = 'rgba(28, 28, 30, 0.55)';
@@ -211,7 +253,7 @@
       ctx.stroke();
       ctx.restore();
 
-      drawValueBadge(ctx, x, py, formatValue(value), color, area);
+      drawValueBadge(ctx, x, py, formatY(value), color, area);
     },
   };
 
@@ -255,10 +297,15 @@
     };
   }
 
-  function makeChart(canvas, label, data, color, xRange, eleData) {
+  function makeChart(canvas, label, data, color, xRange, eleData, chartOpts) {
     if (!window.Chart || !canvas || !data.length) return null;
+    chartOpts = chartOpts || {};
+    var formatY = chartOpts.formatY || formatValue;
+    var reverseY = !!chartOpts.reverseY;
+    var peakMode = chartOpts.peakMode || 'max';
 
-    var s = stats(data);
+    var s = stats(data, peakMode);
+    if (chartOpts.avg != null) s.avg = chartOpts.avg;
     var hasEle = eleData && eleData.length > 0;
     var eleRange = hasEle ? yExtent(eleData) : null;
 
@@ -299,10 +346,10 @@
       order: 2,
     });
 
-    if (s.max) {
+    if (s.peak) {
       datasets.push({
-        label: 'Максимум',
-        data: [s.max],
+        label: peakMode === 'min' ? 'Лучший' : 'Максимум',
+        data: [s.peak],
         borderColor: color,
         backgroundColor: color,
         pointRadius: 5,
@@ -336,8 +383,14 @@
       },
       y: {
         position: 'left',
+        reverse: reverseY,
         grid: { color: '#eee' },
-        ticks: { font: { size: 11 } },
+        ticks: {
+          font: { size: 11 },
+          callback: function (v) {
+            return formatY(v);
+          },
+        },
       },
     };
 
@@ -367,7 +420,7 @@
         },
         plugins: {
           legend: { display: false },
-          chartOverlays: { avg: s.avg, color: color, series: data },
+          chartOverlays: { avg: s.avg, color: color, series: data, formatY: formatY },
           tooltip: { enabled: false },
         },
         scales: scales,
@@ -387,6 +440,7 @@
     }
 
     var durationSec = Number(el.getAttribute('data-duration') || 0);
+    var usePace = el.getAttribute('data-use-pace') === '1';
     var times = streams.time || null;
     if (!times || !times.length) {
       var n = Math.max(
@@ -402,18 +456,20 @@
       }
     }
 
-    var speed = toPoints(streams.speed, times);
+    var speed = usePace ? toPacePoints(streams.speed, times) : toPoints(streams.speed, times);
     var hr = toPoints(streams.hr, times);
     var power = toPoints(streams.power, times);
     var ele = toPoints(streams.ele, times);
     var range = xExtent([speed, hr, power, ele]);
     if (durationSec > range.max) range.max = durationSec;
+    var paceAvg = usePace ? avgPaceFromSpeeds(streams.speed) : null;
 
+    var speedLabel = usePace ? 'Темп, мин/км' : 'Скорость, км/ч';
     var specs = [
-      ['chart-speed', 'Скорость, км/ч', speed, '#FC5200', true],
-      ['chart-hr', 'Пульс', hr, '#E8192E', true],
-      ['chart-power', 'Мощность, Вт', power, '#007FB6', true],
-      ['chart-ele', 'Высота, м', ele, '#6d6d78', false],
+      ['chart-speed', speedLabel, speed, '#FC5200', true, usePace],
+      ['chart-hr', 'Пульс', hr, '#E8192E', true, false],
+      ['chart-power', 'Мощность, Вт', power, '#007FB6', true, false],
+      ['chart-ele', 'Высота, м', ele, '#6d6d78', false, false],
     ];
 
     specs.forEach(function (spec) {
@@ -427,7 +483,15 @@
         return;
       }
       var bgEle = spec[4] ? ele : null;
-      var chart = makeChart(canvas, spec[1], data, spec[3], range, bgEle);
+      var chartOpts = spec[5]
+        ? {
+            formatY: formatPaceMinutes,
+            reverseY: true,
+            peakMode: 'min',
+            avg: paceAvg,
+          }
+        : {};
+      var chart = makeChart(canvas, spec[1], data, spec[3], range, bgEle, chartOpts);
       if (chart) {
         charts.push(chart);
         bindSyncEvents(chart);

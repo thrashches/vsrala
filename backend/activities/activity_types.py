@@ -18,6 +18,9 @@ STANDARD_TYPES = (
     ('rowing', 'Гребля', 90),
 )
 
+# Foot sports: show pace (min/km) instead of speed (km/h).
+PACE_SPORT_SLUGS = frozenset({'running', 'walking', 'skiing'})
+
 INTERVALS_TYPE_MAP = {
     'Ride': 'Шоссейный велосипед',
     'VirtualRide': 'Шоссейный велосипед',
@@ -165,3 +168,11 @@ def seed_standard_types() -> None:
                 updates.append('sort_order')
             if updates:
                 obj.save(update_fields=updates)
+
+
+def activity_uses_pace(activity_type: Optional[ActivityType]) -> bool:
+    """True for foot sports where pace (min/km) is preferred over speed."""
+    if activity_type is None:
+        return False
+    slug = (getattr(activity_type, 'slug', None) or '').strip().lower()
+    return slug in PACE_SPORT_SLUGS

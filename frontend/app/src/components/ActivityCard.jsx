@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatDateTime } from '../lib/format'
+import { formatDateTime, formatPace, usesPace } from '../lib/format'
 import ActivitySource from './ActivitySource'
 import ActivityTypeLabel from './ActivityTypeLabel'
 import Avatar from './Avatar'
@@ -10,6 +10,8 @@ export default function ActivityCard({ activity, onReactionChange }) {
     activity.map_preview_url ||
     activity.zone_timeline_url ||
     activity.medias?.[0]?.url
+  const paceMode = usesPace(activity)
+  const pace = paceMode ? formatPace(activity.avg_speed) : null
 
   return (
     <article className="relative rounded bg-white shadow-card">
@@ -68,9 +70,19 @@ export default function ActivityCard({ activity, onReactionChange }) {
         </div>
         {activity.avg_speed != null && (
           <div>
-            <div className="stat-label">Ср. скорость</div>
+            <div className="stat-label">{paceMode ? 'Ср. темп' : 'Ср. скорость'}</div>
             <div className="text-lg font-bold">
-              {activity.avg_speed} <span className="text-xs font-normal text-ink-muted">км/ч</span>
+              {paceMode ? (
+                <>
+                  {pace || '—'}{' '}
+                  <span className="text-xs font-normal text-ink-muted">/км</span>
+                </>
+              ) : (
+                <>
+                  {activity.avg_speed}{' '}
+                  <span className="text-xs font-normal text-ink-muted">км/ч</span>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -54,16 +54,30 @@
                 <div class="stat-value">{{ activity.duration_display }}</div>
             </div>
             <div>
+                {% if activity.uses_pace %}
+                <div class="stat-label">Ср. темп</div>
+                <div class="stat-value">
+                    {% if activity.avg_pace_display %}{{ activity.avg_pace_display }}<span class="stat-unit">/км</span>{% else %}—{% endif %}
+                </div>
+                {% else %}
                 <div class="stat-label">Ср. скорость</div>
                 <div class="stat-value">
                     {% if activity.avg_speed %}{{ activity.avg_speed }}<span class="stat-unit">км/ч</span>{% else %}—{% endif %}
                 </div>
+                {% endif %}
             </div>
             <div>
+                {% if activity.uses_pace %}
+                <div class="stat-label">Лучший темп</div>
+                <div class="stat-value">
+                    {% if activity.best_pace_display %}{{ activity.best_pace_display }}<span class="stat-unit">/км</span>{% else %}—{% endif %}
+                </div>
+                {% else %}
                 <div class="stat-label">Макс. скорость</div>
                 <div class="stat-value">
                     {% if activity.max_speed %}{{ activity.max_speed }}<span class="stat-unit">км/ч</span>{% else %}—{% endif %}
                 </div>
+                {% endif %}
             </div>
             <div>
                 <div class="stat-label">Набор высоты</div>
@@ -108,9 +122,12 @@
         <div id="activity-streams"
              data-streams="{{ activity.streams_json|escape }}"
              data-duration="{{ activity.duration.total_seconds|floatformat:0 }}"
+             data-use-pace="{% if activity.uses_pace %}1{% else %}0{% endif %}"
              class="space-y-4 border-t border-gray-100 px-5 py-5">
             <div data-chart-panel>
-                <h3 class="mb-2 text-sm font-semibold text-ink">Скорость</h3>
+                <h3 class="mb-2 text-sm font-semibold text-ink" data-chart-title>
+                    {% if activity.uses_pace %}Темп{% else %}Скорость{% endif %}
+                </h3>
                 <div class="h-36">
                     <canvas id="chart-speed"></canvas>
                 </div>
@@ -285,25 +302,46 @@
 
                     {% if activity.avg_speed or activity.avg_moving_speed or activity.max_speed %}
                     <div class="rounded border border-gray-200 px-4 py-3">
-                        <h3 class="mb-3 text-sm font-semibold text-ink">Скорость</h3>
+                        <h3 class="mb-3 text-sm font-semibold text-ink">{% if activity.uses_pace %}Темп{% else %}Скорость{% endif %}</h3>
                         <dl class="space-y-2 text-sm">
-                            {% if activity.avg_speed %}
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-ink-muted">Средняя</dt>
-                                <dd class="font-semibold text-ink">{{ activity.avg_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
-                            </div>
-                            {% endif %}
-                            {% if activity.avg_moving_speed %}
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-ink-muted">Средняя в движении</dt>
-                                <dd class="font-semibold text-ink">{{ activity.avg_moving_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
-                            </div>
-                            {% endif %}
-                            {% if activity.max_speed %}
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-ink-muted">Максимальная</dt>
-                                <dd class="font-semibold text-ink">{{ activity.max_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
-                            </div>
+                            {% if activity.uses_pace %}
+                                {% if activity.avg_pace_display %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">Средний</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.avg_pace_display }} <span class="font-normal text-ink-muted">/км</span></dd>
+                                </div>
+                                {% endif %}
+                                {% if activity.avg_moving_pace_display %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">В движении</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.avg_moving_pace_display }} <span class="font-normal text-ink-muted">/км</span></dd>
+                                </div>
+                                {% endif %}
+                                {% if activity.best_pace_display %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">Лучший</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.best_pace_display }} <span class="font-normal text-ink-muted">/км</span></dd>
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                {% if activity.avg_speed %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">Средняя</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.avg_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                                </div>
+                                {% endif %}
+                                {% if activity.avg_moving_speed %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">Средняя в движении</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.avg_moving_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                                </div>
+                                {% endif %}
+                                {% if activity.max_speed %}
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-ink-muted">Максимальная</dt>
+                                    <dd class="font-semibold text-ink">{{ activity.max_speed }} <span class="font-normal text-ink-muted">км/ч</span></dd>
+                                </div>
+                                {% endif %}
                             {% endif %}
                         </dl>
                     </div>

@@ -4,6 +4,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from activities.activity_types import activity_uses_pace
 from activities.models import Activity, ActivityReaction, ActivityType
 from activities.parsers import TrackParseError
 from activities.services import create_activity_from_upload
@@ -127,6 +128,7 @@ class ActivityListSerializer(serializers.ModelSerializer):
     activity_type = ActivityTypeSerializer(read_only=True)
     duration_display = serializers.CharField(read_only=True)
     duration_active_display = serializers.CharField(read_only=True)
+    uses_pace = serializers.SerializerMethodField()
     map_preview_url = serializers.SerializerMethodField()
     reaction_counts = serializers.SerializerMethodField()
     my_reaction = serializers.SerializerMethodField()
@@ -138,7 +140,7 @@ class ActivityListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'description', 'profile', 'activity_type',
             'duration', 'duration_display', 'duration_active', 'duration_active_display',
-            'distance', 'avg_speed', 'avg_moving_speed', 'max_speed',
+            'distance', 'avg_speed', 'avg_moving_speed', 'max_speed', 'uses_pace',
             'avg_hr', 'max_hr', 'avg_power', 'max_power', 'normalized_power',
             'tss', 'avg_cadence', 'max_cadence',
             'elevation_gain', 'elevation_loss', 'elevation_min', 'elevation_max',
@@ -146,6 +148,10 @@ class ActivityListSerializer(serializers.ModelSerializer):
             'external_source', 'calories', 'device_name',
             'reaction_counts', 'my_reaction', 'comment_count', 'medias',
         )
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_uses_pace(self, obj):
+        return activity_uses_pace(obj.activity_type)
 
     @extend_schema_field(OpenApiTypes.URI)
     def get_map_preview_url(self, obj):

@@ -153,7 +153,10 @@ def best_distance_efforts(
     streams: dict,
     track_points: Optional[Sequence] = None,
     targets_km: Sequence[float] = DISTANCE_TARGETS_KM,
+    use_pace: bool = False,
 ) -> list[dict[str, Any]]:
+    from activities.pace import format_pace
+
     speeds = streams.get('speed') or []
     times = streams.get('time') or []
     t_arr, d_arr = _cumulative_distance_from_speed(speeds, times)
@@ -172,13 +175,18 @@ def best_distance_efforts(
             continue
         speed_kmh = float(target) * 3600.0 / best
         speed_str = f'{speed_kmh:.1f}'.replace('.', ',')
+        if use_pace:
+            pace = format_pace(speed_kmh)
+            rate_display = f'{pace} /км' if pace else '—'
+        else:
+            rate_display = f'{speed_str} км/ч'
         rows.append({
             'distance_km': target,
             'distance_display': f'{int(target) if target == int(target) else target} км',
             'seconds': best,
             'time_display': format_effort_duration(best),
             'speed_kmh': round(speed_kmh, 1),
-            'speed_display': f'{speed_str} км/ч',
+            'speed_display': rate_display,
         })
     return rows
 
@@ -256,12 +264,19 @@ def best_power_efforts(
 
 
 def build_best_efforts(activity) -> dict[str, Any]:
+    from activities.activity_types import activity_uses_pace
+
     streams = activity.streams or {}
-    distance_rows = best_distance_efforts(streams, activity.track_points or [])
+    use_pace = activity_uses_pace(getattr(activity, 'activity_type', None))
+    distance_rows = best_distance_efforts(
+        streams, activity.track_points or [], use_pace=use_pace,
+    )
     power_rows = best_power_efforts(streams)
     return {
         'distance_efforts': distance_rows,
         'power_efforts': power_rows,
         'has_distance_efforts': bool(distance_rows),
         'has_power_efforts': bool(power_rows),
+        'use_pace': use_pace,
+        'rate_label': 'Темп' if use_pace else 'Скорость',
     }

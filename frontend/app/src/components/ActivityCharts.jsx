@@ -20,6 +20,15 @@ function formatValue(v) {
     : String(Math.round(v * 10) / 10)
 }
 
+/** Pace as decimal minutes/km → ``m:ss``. */
+function formatPaceMinutes(minPerKm) {
+  if (minPerKm == null || !Number.isFinite(minPerKm) || minPerKm <= 0) return ''
+  const totalSec = Math.max(0, Math.round(minPerKm * 60))
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function toPoints(values, times) {
   const out = []
   const arr = values || []
@@ -32,14 +41,46 @@ function toPoints(values, times) {
   return out
 }
 
-function stats(points) {
-  let maxPt = null
+/** Convert speed (km/h) stream to pace (min/km), dropping near-stops. */
+function toPacePoints(speeds, times) {
+  const out = []
+  const arr = speeds || []
+  for (let i = 0; i < arr.length; i++) {
+    const kmh = arr[i]
+    if (kmh == null || kmh < 0.5) continue
+    const pace = 60 / kmh
+    if (!Number.isFinite(pace) || pace > 45) continue
+    const x = times && times[i] != null ? Number(times[i]) : i
+    out.push({ x, y: pace })
+  }
+  return out
+}
+
+function avgPaceFromSpeeds(speeds) {
+  let sum = 0
+  let n = 0
+  for (const kmh of speeds || []) {
+    if (kmh != null && kmh >= 0.5) {
+      sum += kmh
+      n += 1
+    }
+  }
+  if (!n) return null
+  return 60 / (sum / n)
+}
+
+function stats(points, peakMode = 'max') {
+  let peakPt = null
   let sum = 0
   for (const p of points) {
     sum += p.y
-    if (!maxPt || p.y > maxPt.y) maxPt = p
+    if (!peakPt) {
+      peakPt = p
+      continue
+    }
+    if (peakMode === 'min' ? p.y < peakPt.y : p.y > peakPt.y) peakPt = p
   }
-  return { max: maxPt, avg: points.length ? sum / points.length : 0 }
+  return { peak: peakPt, avg: points.length ? sum / points.length : 0 }
 }
 
 function xExtent(datasets) {
@@ -126,6 +167,7 @@ function createOverlaysPlugin(getSyncTime) {
       const avg = opts.avg
       const color = opts.color || '#333'
       const series = opts.series || chart.data.datasets[0]?.data || []
+      const formatY = opts.formatY || formatValue
 
       if (avg != null) {
         const avgY = yScale.getPixelForValue(avg)
@@ -135,7 +177,7 @@ function createOverlaysPlugin(getSyncTime) {
           ctx.fillStyle = 'rgba(28, 28, 30, 0.55)'
           ctx.textAlign = 'right'
           ctx.textBaseline = 'bottom'
-          ctx.fillText(`ср. ${formatValue(avg)}`, area.right - 4, avgY - 2)
+          ctx.fillText(`ср. ${formatY(avg)}`, area.right - 4, avgY - 2)
           ctx.restore()
         }
       }
@@ -169,7 +211,7 @@ function createOverlaysPlugin(getSyncTime) {
       ctx.stroke()
       ctx.restore()
 
-      drawValueBadge(ctx, x, py, formatValue(value), color, area)
+      drawValueBadge(ctx, x, py, formatY(value), color, area)
     },
   }
 }
@@ -192,9 +234,13 @@ function elevationDataset(eleData) {
   }
 }
 
-function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime) {
+function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime, chartOpts = {}) {
   if (!canvas || !data.length) return null
-  const s = stats(data)
+  const formatY = chartOpts.formatY || formatValue
+  const reverseY = Boolean(chartOpts.reverseY)
+  const peakMode = chartOpts.peakMode || 'max'
+  const s = stats(data, peakMode)
+  if (chartOpts.avg != null) s.avg = chartOpts.avg
   const hasEle = eleData && eleData.length > 0
   const eleRange = hasEle ? yExtent(eleData) : null
   const datasets = []
@@ -235,10 +281,10 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime) {
     },
   )
 
-  if (s.max) {
+  if (s.peak) {
     datasets.push({
-      label: 'Максимум',
-      data: [s.max],
+      label: peakMode === 'min' ? 'Лучший' : 'Максимум',
+      data: [s.peak],
       borderColor: color,
       backgroundColor: color,
       pointRadius: 5,
@@ -262,7 +308,11 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime) {
     y: {
       type: 'linear',
       ...yExtent(data),
-      ticks: { maxTicksLimit: 4 },
+      reverse: reverseY,
+      ticks: {
+        maxTicksLimit: 4,
+        callback: (v) => formatY(v),
+      },
       title: { display: false },
       grid: { color: 'rgba(0,0,0,0.06)' },
     },
@@ -290,7 +340,7 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime) {
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       plugins: {
         legend: { display: false },
-        chartOverlays: { avg: s.avg, color, series: data },
+        chartOverlays: { avg: s.avg, color, series: data, formatY },
         tooltip: { enabled: false },
       },
       scales,
@@ -300,13 +350,13 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime) {
 }
 
 const SPECS = [
-  { key: 'speed', title: 'Скорость', color: '#FC5200', withEleBg: true },
+  { key: 'speed', title: 'Скорость', paceTitle: 'Темп', color: '#FC5200', withEleBg: true },
   { key: 'hr', title: 'Пульс', color: '#E8192E', withEleBg: true },
   { key: 'power', title: 'Мощность', color: '#007FB6', withEleBg: true },
   { key: 'ele', title: 'Высота', color: '#6d6d78', withEleBg: false },
 ]
 
-export default function ActivityCharts({ streams, durationSec = 0, onHoverTime }) {
+export default function ActivityCharts({ streams, durationSec = 0, usePace = false, onHoverTime }) {
   const rootRef = useRef(null)
   const chartsRef = useRef([])
   const syncTimeRef = useRef(null)
@@ -332,13 +382,14 @@ export default function ActivityCharts({ streams, durationSec = 0, onHoverTime }
       }
     }
 
-    const speed = toPoints(streams.speed, times)
+    const speed = usePace ? toPacePoints(streams.speed, times) : toPoints(streams.speed, times)
     const hr = toPoints(streams.hr, times)
     const power = toPoints(streams.power, times)
     const ele = toPoints(streams.ele, times)
     const byKey = { speed, hr, power, ele }
     const range = xExtent([speed, hr, power, ele])
     if (durationSec > range.max) range.max = durationSec
+    const paceAvg = usePace ? avgPaceFromSpeeds(streams.speed) : null
 
     const getSyncTime = () => syncTimeRef.current
     const scheduleRedraw = () => {
@@ -363,13 +414,35 @@ export default function ActivityCharts({ streams, durationSec = 0, onHoverTime }
       const panel = rootRef.current.querySelector(`[data-chart-panel="${spec.key}"]`)
       const canvas = panel?.querySelector('canvas')
       const data = byKey[spec.key]
+      const titleEl = panel?.querySelector('[data-chart-title]')
+      const title =
+        usePace && spec.key === 'speed' && spec.paceTitle ? spec.paceTitle : spec.title
+      if (titleEl) titleEl.textContent = title
       if (!data.length) {
         panel?.classList.add('hidden')
         return
       }
       panel?.classList.remove('hidden')
       const bgEle = spec.withEleBg ? ele : null
-      const chart = makeChart(canvas, spec.title, data, spec.color, range, bgEle, getSyncTime)
+      const chartOpts =
+        usePace && spec.key === 'speed'
+          ? {
+              formatY: formatPaceMinutes,
+              reverseY: true,
+              peakMode: 'min',
+              avg: paceAvg,
+            }
+          : {}
+      const chart = makeChart(
+        canvas,
+        title,
+        data,
+        spec.color,
+        range,
+        bgEle,
+        getSyncTime,
+        chartOpts,
+      )
       if (!chart) return
       charts.push(chart)
 
@@ -399,7 +472,7 @@ export default function ActivityCharts({ streams, durationSec = 0, onHoverTime }
       syncTimeRef.current = null
       onHoverTimeRef.current?.(null)
     }
-  }, [streams, durationSec])
+  }, [streams, durationSec, usePace])
 
   const hasAny =
     streams &&
@@ -411,7 +484,9 @@ export default function ActivityCharts({ streams, durationSec = 0, onHoverTime }
     <div ref={rootRef} className="space-y-4 border-t border-gray-100 px-5 py-5">
       {SPECS.map((spec) => (
         <div key={spec.key} data-chart-panel={spec.key}>
-          <h3 className="mb-2 text-sm font-semibold text-ink">{spec.title}</h3>
+          <h3 data-chart-title className="mb-2 text-sm font-semibold text-ink">
+            {usePace && spec.paceTitle ? spec.paceTitle : spec.title}
+          </h3>
           <div className="h-36">
             <canvas />
           </div>
