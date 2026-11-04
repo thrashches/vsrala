@@ -36,6 +36,7 @@ from api.permissions import (
 from api.serializers import (
     ActivityDetailSerializer,
     ActivityListSerializer,
+    ActivityTypeSerializer,
     ActivityUpdateSerializer,
     ActivityUploadSerializer,
     ApiKeySerializer,
@@ -374,6 +375,16 @@ class ActivityCommentDetailView(APIView):
             'comment_count': count,
             'comment_count_label': comment_count_label(count),
         })
+
+
+class ActivityTypeListView(generics.ListAPIView):
+    serializer_class = ActivityTypeSerializer
+    queryset = ActivityType.objects.all().order_by('sort_order', 'name')
+    pagination_class = None
+
+    @extend_schema(tags=['activities'], summary='Типы активностей')
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
 
 class WeeklyLeadersView(APIView):

@@ -6,6 +6,7 @@
   const profileUrlTemplate = root.dataset.profileUrlTemplate || '';
   const labelEl = root.querySelector('[data-week-label]');
   const listEl = root.querySelector('[data-leaders-list]');
+  const sportGroup = root.querySelector('[data-sport-group]');
 
   const state = {
     week: 'current',
@@ -39,6 +40,34 @@
     setPressed('data-week', state.week);
     setPressed('data-metric', state.metric);
     setPressed('data-sport', state.sport);
+  }
+
+  function renderSports(sports) {
+    if (!sportGroup) return;
+    const available = sports || [];
+    const ids = available.map(function (s) { return String(s.id); });
+    if (state.sport && ids.indexOf(String(state.sport)) === -1) {
+      state.sport = '';
+    }
+
+    let html =
+      '<button type="button" class="btn-ghost !px-2 !py-1 text-xs" data-sport="" aria-pressed="' +
+      (!state.sport ? 'true' : 'false') +
+      '">Все</button>';
+    available.forEach(function (sport) {
+      const id = String(sport.id);
+      const pressed = state.sport === id;
+      html +=
+        '<button type="button" class="btn-ghost !px-2 !py-1 text-xs" data-sport="' +
+        escapeHtml(id) +
+        '" aria-pressed="' +
+        (pressed ? 'true' : 'false') +
+        '">' +
+        escapeHtml(sport.name) +
+        '</button>';
+    });
+    sportGroup.innerHTML = html;
+    syncPressed();
   }
 
   function renderLeaders(leaders) {
@@ -100,6 +129,7 @@
       const data = await response.json();
       if (id !== requestId) return;
       if (labelEl && data.week_label) labelEl.textContent = data.week_label;
+      renderSports(data.available_sports || []);
       renderLeaders(data.leaders || []);
     } catch (e) {
       /* ignore network errors */

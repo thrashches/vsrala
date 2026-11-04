@@ -42,8 +42,8 @@ class WeeklyLeadersServiceTest(TestCase):
         )
         Follow.objects.create(user=self.me, following=self.friend)
 
-        self.ride = ActivityType.objects.create(name='Шоссейный велосипед')
-        self.run = ActivityType.objects.create(name='Бег')
+        self.ride = ActivityType.objects.get(name='Шоссейный велосипед')
+        self.run = ActivityType.objects.get(name='Бег')
 
         self.today = date(2026, 10, 7)  # Wednesday
         tz = ZoneInfo('Europe/Moscow')
@@ -105,6 +105,16 @@ class WeeklyLeadersServiceTest(TestCase):
         self.assertEqual(len(result['leaders']), 1)
         self.assertEqual(result['leaders'][0]['profile_id'], self.friend.pk)
         self.assertEqual(result['leaders'][0]['total'], 10.0)
+
+    def test_available_sports_for_week(self):
+        result = weekly_leaders(self.me, today=self.today)
+        sport_ids = {s['id'] for s in result['available_sports']}
+        self.assertEqual(sport_ids, {self.ride.pk, self.run.pk})
+        names = {s['name'] for s in result['available_sports']}
+        self.assertEqual(names, {'Шоссейный велосипед', 'Бег'})
+
+        prev = weekly_leaders(self.me, week='previous', today=self.today)
+        self.assertEqual([s['id'] for s in prev['available_sports']], [self.ride.pk])
 
     def test_metric_duration_changes_order(self):
         # me: 1.5h, friend: 2h+1h=3h → friend first by duration too,

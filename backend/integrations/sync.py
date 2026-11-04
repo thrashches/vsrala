@@ -9,7 +9,8 @@ from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils import timezone as dj_timezone
 
-from activities.models import Activity, ActivityType
+from activities.activity_types import INTERVALS_TYPE_MAP, resolve_intervals_type
+from activities.models import Activity
 from activities.parsers import TrackParseError, parse_track
 
 from .dedup import (
@@ -25,17 +26,8 @@ logger = logging.getLogger(__name__)
 
 EXTERNAL_SOURCE = SOURCE_INTERVALS
 
-# Map Intervals.icu sport types to local ActivityType names.
-TYPE_NAME_MAP = {
-    'Ride': 'Шоссейный велосипед',
-    'VirtualRide': 'Шоссейный велосипед',
-    'MountainBikeRide': 'Горный велосипед',
-    'GravelRide': 'Кроссовый велосипед',
-    'TrackCycling': 'Трековый велосипед',
-    'Run': 'Бег',
-    'VirtualRun': 'Бег',
-    'Swim': 'Заплыв',
-}
+# Backwards-compatible alias for tests/imports.
+TYPE_NAME_MAP = INTERVALS_TYPE_MAP
 
 
 def verify_api_key(api_key: str) -> dict:
@@ -243,13 +235,8 @@ def import_remote_activity(
     return activity
 
 
-def resolve_activity_type(intervals_type: Optional[str]) -> Optional[ActivityType]:
-    if not intervals_type:
-        return None
-    name = TYPE_NAME_MAP.get(intervals_type)
-    if not name:
-        return None
-    return ActivityType.objects.filter(name=name).first()
+def resolve_activity_type(intervals_type: Optional[str]):
+    return resolve_intervals_type(intervals_type)
 
 
 def _download_track_bytes(

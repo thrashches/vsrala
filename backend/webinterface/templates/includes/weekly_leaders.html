@@ -22,12 +22,12 @@
                     data-metric="duration" aria-pressed="false">Время</button>
         </div>
 
-        <div class="flex flex-wrap gap-1 pt-3" role="group" aria-label="Вид спорта">
+        <div class="flex flex-wrap gap-1 pt-3" role="group" aria-label="Вид спорта" data-sport-group>
             <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
                     data-sport="" aria-pressed="true">Все</button>
-            {% for sport in activity_types %}
+            {% for sport in weekly_leaders.available_sports %}
                 <button type="button" class="btn-ghost !px-2 !py-1 text-xs"
-                        data-sport="{{ sport.pk }}" aria-pressed="false">{{ sport.name }}</button>
+                        data-sport="{{ sport.id }}" aria-pressed="false">{{ sport.name }}</button>
             {% endfor %}
         </div>
     </div>

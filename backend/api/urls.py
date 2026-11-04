@@ -7,6 +7,7 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='api_logout'),
 
     path('activities/', views.ActivityListCreateView.as_view(), name='api_activity_list'),
+    path('activity-types/', views.ActivityTypeListView.as_view(), name='api_activity_types'),
     path('activities/<int:pk>/', views.ActivityDetailView.as_view(), name='api_activity_detail'),
     path(
         'activities/<int:pk>/download/',

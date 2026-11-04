@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { activitiesApi } from '../api/endpoints'
+import { activitiesApi, activityTypesApi } from '../api/endpoints'
 import { ButtonSpinner } from '../components/skeletons'
 
 export default function ActivityUploadPage() {
@@ -8,8 +8,17 @@ export default function ActivityUploadPage() {
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [activityTypeId, setActivityTypeId] = useState('')
+  const [types, setTypes] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    activityTypesApi
+      .list()
+      .then((data) => setTypes(Array.isArray(data) ? data : data.results || []))
+      .catch(() => setTypes([]))
+  }, [])
 
   async function onSubmit(e) {
     e.preventDefault()
@@ -24,6 +33,7 @@ export default function ActivityUploadPage() {
       fd.append('track_file', file)
       if (title) fd.append('title', title)
       if (description) fd.append('description', description)
+      if (activityTypeId) fd.append('activity_type', activityTypeId)
       const activity = await activitiesApi.create(fd)
       navigate(`/activities/${activity.id}/`)
     } catch (err) {
@@ -55,6 +65,24 @@ export default function ActivityUploadPage() {
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             required
           />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="activity_type">
+            Тип активности
+          </label>
+          <select
+            id="activity_type"
+            className="field-input"
+            value={activityTypeId}
+            onChange={(e) => setActivityTypeId(e.target.value)}
+          >
+            <option value="">Определить автоматически</option>
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="field-label" htmlFor="title">

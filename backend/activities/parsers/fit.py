@@ -31,16 +31,38 @@ def _semicircles_to_deg(value) -> Optional[float]:
     return value * (180.0 / 2 ** 31)
 
 
-def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
+def _open_fit(source: Union[str, Path, BinaryIO]) -> FitFile:
     try:
         if hasattr(source, 'read'):
             if hasattr(source, 'seek'):
                 source.seek(0)
-            fit = FitFile(source)
-        else:
-            fit = FitFile(str(source))
+            return FitFile(source)
+        return FitFile(str(source))
     except Exception as exc:
         raise TrackParseError(f'Не удалось разобрать FIT: {exc}') from exc
+
+
+def read_fit_sport(source: Union[str, Path, BinaryIO]) -> tuple[Optional[str], Optional[str]]:
+    """Return (sport, sub_sport) from FIT session messages without full track parse."""
+    fit = _open_fit(source)
+    sport = None
+    sub_sport = None
+    try:
+        for session in fit.get_messages('session'):
+            sdata = {f.name: f.value for f in session}
+            if sport is None and sdata.get('sport') is not None:
+                sport = str(sdata['sport'])
+            if sub_sport is None and sdata.get('sub_sport') is not None:
+                sub_sport = str(sdata['sub_sport'])
+            if sport is not None and sub_sport is not None:
+                break
+    except Exception as exc:
+        raise TrackParseError(f'Ошибка чтения FIT session: {exc}') from exc
+    return sport, sub_sport
+
+
+def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
+    fit = _open_fit(source)
 
     points = []
     times = []
@@ -130,6 +152,8 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
     session_tss = None
     session_avg_cadence = None
     session_max_cadence = None
+    sport = None
+    sub_sport = None
     try:
         for session in fit.get_messages('session'):
             sdata = {f.name: f.value for f in session}
@@ -159,6 +183,10 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
                 session_tss = round(float(sdata['training_stress_score']), 1)
             session_avg_cadence = sdata.get('avg_cadence') or session_avg_cadence
             session_max_cadence = sdata.get('max_cadence') or session_max_cadence
+            if sport is None and sdata.get('sport') is not None:
+                sport = str(sdata['sport'])
+            if sub_sport is None and sdata.get('sub_sport') is not None:
+                sub_sport = str(sdata['sub_sport'])
     except Exception:
         pass
 
@@ -261,6 +289,8 @@ def parse_fit(source: Union[str, Path, BinaryIO]) -> ParsedTrack:
         elevation_loss=elev_loss,
         elevation_min=elev_min,
         elevation_max=elev_max,
+        sport=sport,
+        sub_sport=sub_sport,
         points=map_points,
         streams=streams,
     )

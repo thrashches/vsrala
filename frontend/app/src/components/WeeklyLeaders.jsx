@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { leadersApi } from '../api/endpoints'
 import Avatar from './Avatar'
 import { LeaderRowSkeleton } from './skeletons'
+import { activityTypeIcon } from '../lib/activityTypeIcons'
 
 const METRICS = [
   { id: 'distance', label: 'Дистанция' },
@@ -17,6 +18,8 @@ const WEEKS = [
 export default function WeeklyLeaders() {
   const [metric, setMetric] = useState('distance')
   const [week, setWeek] = useState('current')
+  const [sport, setSport] = useState('')
+  const [sports, setSports] = useState([])
   const [rows, setRows] = useState([])
   const [weekLabel, setWeekLabel] = useState('')
   const [loading, setLoading] = useState(true)
@@ -24,15 +27,25 @@ export default function WeeklyLeaders() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    const params = { metric, week }
+    if (sport) params.sport = sport
     leadersApi
-      .weekly({ metric, week })
+      .weekly(params)
       .then((data) => {
         if (cancelled) return
+        const available = data.available_sports || []
+        setSports(available)
         setRows(data.leaders || [])
         setWeekLabel(data.week_label || '')
+        if (sport && !available.some((s) => String(s.id) === String(sport))) {
+          setSport('')
+        }
       })
       .catch(() => {
-        if (!cancelled) setRows([])
+        if (!cancelled) {
+          setRows([])
+          setSports([])
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -40,7 +53,7 @@ export default function WeeklyLeaders() {
     return () => {
       cancelled = true
     }
-  }, [metric, week])
+  }, [metric, week, sport])
 
   return (
     <aside className="rounded bg-white p-4 shadow-card">
@@ -74,6 +87,37 @@ export default function WeeklyLeaders() {
           </button>
         ))}
       </div>
+      {sports.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          <button
+            type="button"
+            className={`rounded px-2 py-1 text-xs font-semibold ${
+              !sport ? 'bg-brand text-white' : 'bg-gray-100 text-ink hover:bg-gray-200'
+            }`}
+            onClick={() => setSport('')}
+          >
+            Все
+          </button>
+          {sports.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`inline-flex items-center gap-0.5 rounded px-2 py-1 text-xs font-semibold ${
+                String(sport) === String(s.id)
+                  ? 'bg-brand text-white'
+                  : 'bg-gray-100 text-ink hover:bg-gray-200'
+              }`}
+              onClick={() => setSport(String(s.id))}
+              title={s.name}
+            >
+              <span className="material-icons text-[14px] leading-none" aria-hidden="true">
+                {activityTypeIcon(s.slug)}
+              </span>
+              <span className="max-w-[7rem] truncate">{s.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="mt-4 space-y-3">
         {loading && (
           <>

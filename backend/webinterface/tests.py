@@ -443,7 +443,7 @@ class WeeklyLeadersApiTest(TestCase):
             email='friend@example.com', password='testpass123', first_name='Друг',
         )
         Follow.objects.create(user=self.user, following=self.friend)
-        self.ride = ActivityType.objects.create(name='Шоссейный велосипед')
+        self.ride = ActivityType.objects.get(name='Шоссейный велосипед')
         Activity.objects.create(
             profile=self.friend,
             title='Заезд',

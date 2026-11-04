@@ -119,7 +119,7 @@ class ProfileSearchSerializer(ProfileBriefSerializer):
 class ActivityTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityType
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'slug', 'sort_order')
 
 
 class ActivityListSerializer(serializers.ModelSerializer):

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../lib/format'
 import ActivitySource from './ActivitySource'
+import ActivityTypeLabel from './ActivityTypeLabel'
 import Avatar from './Avatar'
 import Reactions from './Reactions'
 
@@ -24,7 +25,12 @@ export default function ActivityCard({ activity, onReactionChange }) {
           </div>
           <div className="text-xs text-ink-muted">
             {formatDateTime(activity.started_at)}
-            {activity.activity_type?.name ? ` · ${activity.activity_type.name}` : ''}
+            {activity.activity_type?.name ? (
+              <>
+                {' · '}
+                <ActivityTypeLabel activityType={activity.activity_type} />
+              </>
+            ) : null}
             {activity.is_indoor ? (
               <>
                 {' · '}

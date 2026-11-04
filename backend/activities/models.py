@@ -11,8 +11,17 @@ class ActivityType(models.Model):
     class Meta:
         verbose_name = 'тип тренировки'
         verbose_name_plural = 'типы тренировок'
+        ordering = ['sort_order', 'name']
 
     name = models.CharField(max_length=255, unique=True, verbose_name='название')
+    slug = models.SlugField(
+        max_length=64,
+        unique=True,
+        blank=True,
+        null=True,
+        verbose_name='код',
+    )
+    sort_order = models.PositiveIntegerField(default=1000, verbose_name='порядок')
 
     def __str__(self):
         return self.name

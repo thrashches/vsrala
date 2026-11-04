@@ -11,7 +11,8 @@ from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils import timezone as dj_timezone
 
-from activities.models import Activity, ActivityType
+from activities.activity_types import GARMIN_TYPE_MAP, resolve_garmin_type
+from activities.models import Activity
 from activities.parsers import TrackParseError, parse_track
 from profiles.zones import POWER_ZONE_NAMES, normalize_zones
 
@@ -33,22 +34,8 @@ logger = logging.getLogger(__name__)
 
 EXTERNAL_SOURCE = SOURCE_GARMIN
 
-# Map Garmin activityType typeKey → local ActivityType names.
-TYPE_NAME_MAP = {
-    'cycling': 'Шоссейный велосипед',
-    'road_biking': 'Шоссейный велосипед',
-    'virtual_ride': 'Шоссейный велосипед',
-    'indoor_cycling': 'Шоссейный велосипед',
-    'mountain_biking': 'Горный велосипед',
-    'gravel_cycling': 'Кроссовый велосипед',
-    'track_cycling': 'Трековый велосипед',
-    'running': 'Бег',
-    'treadmill_running': 'Бег',
-    'trail_running': 'Бег',
-    'swimming': 'Заплыв',
-    'lap_swimming': 'Заплыв',
-    'open_water_swimming': 'Заплыв',
-}
+# Backwards-compatible alias for tests/imports.
+TYPE_NAME_MAP = GARMIN_TYPE_MAP
 
 
 def _client_for_connection(connection: GarminConnection) -> GarminClient:
@@ -398,13 +385,8 @@ def _type_key(summary: dict, remote: dict) -> Optional[str]:
     return None
 
 
-def resolve_activity_type(type_key: Optional[str]) -> Optional[ActivityType]:
-    if not type_key:
-        return None
-    name = TYPE_NAME_MAP.get(type_key) or TYPE_NAME_MAP.get(type_key.lower())
-    if not name:
-        return None
-    return ActivityType.objects.filter(name=name).first()
+def resolve_activity_type(type_key: Optional[str]):
+    return resolve_garmin_type(type_key)
 
 
 def _parse_started_at(summary: dict, remote: dict):

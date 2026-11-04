@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models import Sum
 from django.utils import timezone
 
-from activities.models import Activity
+from activities.models import Activity, ActivityType
 from profiles.models import Profile
 
 VALID_METRICS = frozenset({'distance', 'duration'})
@@ -93,18 +93,33 @@ def weekly_leaders(
         started_at__gte=start,
         started_at__lt=end,
     )
+
+    type_ids = list(
+        qs.exclude(activity_type_id__isnull=True)
+        .values_list('activity_type_id', flat=True)
+        .distinct()
+    )
+    available_sports = [
+        {'id': t.pk, 'name': t.name, 'slug': t.slug or ''}
+        for t in ActivityType.objects.filter(pk__in=type_ids).order_by('sort_order', 'name')
+    ]
+    available_ids = {s['id'] for s in available_sports}
+    if sport_id is not None and sport_id not in available_ids:
+        sport_id = None
+
+    filtered = qs
     if sport_id is not None:
-        qs = qs.filter(activity_type_id=sport_id)
+        filtered = filtered.filter(activity_type_id=sport_id)
 
     if metric == 'distance':
         rows = (
-            qs.values('profile_id')
+            filtered.values('profile_id')
             .annotate(total=Sum('distance'))
             .order_by('-total')[:limit]
         )
     else:
         rows = (
-            qs.values('profile_id')
+            filtered.values('profile_id')
             .annotate(total=Sum('duration'))
             .order_by('-total')[:limit]
         )
@@ -148,5 +163,6 @@ def weekly_leaders(
         'week_end': end.isoformat(),
         'metric': metric,
         'sport': sport_id,
+        'available_sports': available_sports,
         'leaders': leaders,
     }

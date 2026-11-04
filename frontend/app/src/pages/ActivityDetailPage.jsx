@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { activitiesApi } from '../api/endpoints'
 import ActivityCharts from '../components/ActivityCharts'
 import ActivitySource from '../components/ActivitySource'
+import ActivityTypeLabel from '../components/ActivityTypeLabel'
 import Avatar from '../components/Avatar'
 import Reactions from '../components/Reactions'
 import { ActivityDetailSkeleton, ButtonSpinner } from '../components/skeletons'
@@ -321,7 +322,12 @@ export default function ActivityDetailPage() {
               </div>
               <div className="text-xs text-ink-muted">
                 {formatDateTime(activity.started_at)}
-                {activity.activity_type?.name ? ` · ${activity.activity_type.name}` : ''}
+                {activity.activity_type?.name ? (
+                  <>
+                    {' · '}
+                    <ActivityTypeLabel activityType={activity.activity_type} />
+                  </>
+                ) : null}
                 {activity.is_indoor ? (
                   <>
                     {' · '}

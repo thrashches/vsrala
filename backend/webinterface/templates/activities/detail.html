@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static activity_types %}
 {% block title %}{{ activity.title }}{% endblock title %}
 
 {% block extra_head %}
@@ -21,7 +21,7 @@
                     </div>
                     <div class="text-xs text-ink-muted">
                         {{ activity.started_at|date:"d M Y, H:i" }}
-                        {% if activity.activity_type %} · {{ activity.activity_type.name }}{% endif %}
+                        {% if activity.activity_type %} · {% activity_type_label activity.activity_type %}{% endif %}
                         {% if activity.is_indoor %}
                             · <span class="font-semibold text-ink">Indoor</span>
                         {% endif %}

@@ -29,6 +29,10 @@ export const activitiesApi = {
   download: (id) => apiDownload(`/activities/${id}/download/`),
 }
 
+export const activityTypesApi = {
+  list: () => api('/activity-types/'),
+}
+
 export const leadersApi = {
   weekly: (params = {}) => {
     const q = new URLSearchParams(params).toString()

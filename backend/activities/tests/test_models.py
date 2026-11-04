@@ -16,22 +16,26 @@ class ActivityModelTest(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.profile = Profile.objects.create(email='test@mail.ru')
-        activity_types = [
-            ActivityType(name='Шоссейный велосипед'),
-            ActivityType(name='Горный велосипед'),
-            ActivityType(name='Трековый велосипед'),
-            ActivityType(name='Кроссовый велосипед'),
-            ActivityType(name='Бег'),
-            ActivityType(name='Заплыв'),
-        ]
-        cls.activity_types = ActivityType.objects.bulk_create(activity_types)
 
-    def test_activity_types_init(self):
-        activity_types = ActivityType.objects.all()
-        assert activity_types.count() == 6, 'Типы тренировок не созданы!'
+    def test_activity_types_seeded(self):
+        names = set(ActivityType.objects.values_list('name', flat=True))
+        for expected in (
+            'Шоссейный велосипед',
+            'Горный велосипед',
+            'Трековый велосипед',
+            'Кроссовый велосипед',
+            'Бег',
+            'Заплыв',
+            'Ходьба',
+            'Лыжи',
+            'Гребля',
+        ):
+            self.assertIn(expected, names)
+        self.assertTrue(ActivityType.objects.filter(slug='road_cycling').exists())
+        self.assertTrue(ActivityType.objects.filter(slug='running').exists())
 
     def test_create_activity_model(self):
-        activity_type = ActivityType.objects.first()
+        activity_type = ActivityType.objects.get(slug='road_cycling')
         Activity.objects.create(
             profile=self.profile,
             duration=timedelta(hours=2),

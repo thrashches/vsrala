@@ -115,8 +115,7 @@ class IntervalsClientTest(TestCase):
 class SyncServiceTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        ActivityType.objects.create(name='Шоссейный велосипед')
-        ActivityType.objects.create(name='Бег')
+        pass
 
     def setUp(self):
         self.profile = Profile.objects.create_user(email='rider@example.com', password='testpass123')
@@ -416,7 +415,7 @@ class DedupMergeTest(TestCase):
 class GarminSyncServiceTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        ActivityType.objects.create(name='Шоссейный велосипед')
+        pass
 
     def setUp(self):
         self.profile = Profile.objects.create_user(email='g@example.com', password='testpass123')

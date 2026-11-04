@@ -59,7 +59,6 @@ from routes.services import (
 
 def _weekly_leaders_context(user):
     return {
-        'activity_types': ActivityType.objects.order_by('name'),
         'weekly_leaders': weekly_leaders(user, metric='distance', week='current'),
         'weekly_leaders_api_url': reverse('webinterface:weekly_leaders_api'),
     }

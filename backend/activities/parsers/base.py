@@ -27,6 +27,8 @@ class ParsedTrack:
     elevation_loss: Optional[float] = None
     elevation_min: Optional[float] = None
     elevation_max: Optional[float] = None
+    sport: Optional[str] = None
+    sub_sport: Optional[str] = None
     points: list = field(default_factory=list)  # [[lat, lon, elapsed_sec?], ...]
     streams: dict = field(default_factory=dict)  # speed, hr, power, ele, cadence, time
 
