@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 from io import BytesIO
 from typing import Optional
 
@@ -78,7 +78,7 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
 
     today = dj_timezone.localdate()
     if initial or not connection.initial_sync_done:
-        oldest = today - timedelta(days=183)  # ~6 months
+        oldest = date(today.year, 1, 1)
         initial = True
     elif connection.last_synced_at:
         oldest = (connection.last_synced_at - timedelta(days=1)).date()

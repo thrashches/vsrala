@@ -266,7 +266,7 @@
                                     {% endif %}
                                 </p>
                             {% else %}
-                                <p class="mt-0.5 text-xs text-ink-muted">Идёт начальная загрузка за последние 6 месяцев…</p>
+                                <p class="mt-0.5 text-xs text-ink-muted">Идёт начальная загрузка с начала текущего года…</p>
                             {% endif %}
                         {% elif intervals_connection and intervals_connection.last_error %}
                             <p class="mt-0.5 text-xs text-red-600">Ошибка: {{ intervals_connection.last_error|truncatechars:120 }}</p>

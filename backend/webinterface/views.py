@@ -491,7 +491,7 @@ class ProfileSettingsView(LoginRequiredMixin, View):
                         return redirect('webinterface:settings')
                     messages.success(
                         request,
-                        'Intervals.icu подключён. Начата загрузка тренировок за последние 6 месяцев.',
+                        'Intervals.icu подключён. Начата загрузка тренировок с начала текущего года.',
                     )
                     return redirect('webinterface:settings')
             profile_form = ProfileSettingsForm(instance=request.user)

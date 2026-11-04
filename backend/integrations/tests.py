@@ -201,6 +201,11 @@ class SyncServiceTest(TestCase):
         self.assertIsNotNone(self.connection.last_synced_at)
         self.assertEqual(Activity.objects.filter(external_id='i300').count(), 1)
 
+        expected_oldest = f'{dj_timezone.localdate().year}-01-01'
+        mock_client.list_activities.assert_called()
+        call_kwargs = mock_client.list_activities.call_args.kwargs
+        self.assertEqual(call_kwargs['oldest'], expected_oldest)
+
         # Second run should not create duplicates
         created_again = sync_connection(self.connection, initial=False)
         self.assertEqual(created_again, 0)
@@ -220,6 +225,41 @@ class SyncServiceTest(TestCase):
         self.assertEqual(result['enqueued'], 1)
         mock_delay.assert_called_once_with(self.connection.pk, initial=False)
         self.assertTrue(pending.pk)  # still exists, just not enqueued
+
+
+class IntervalsConnectionAdminTest(TestCase):
+    def setUp(self):
+        self.admin = Profile.objects.create_superuser(
+            email='admin-intervals@example.com',
+            password='testpass123',
+        )
+        self.profile = Profile.objects.create_user(
+            email='rider-admin@example.com',
+            password='x',
+        )
+        self.connection = IntervalsConnection.objects.create(
+            profile=self.profile,
+            api_key='valid-key',
+            athlete_id='123',
+            is_active=True,
+        )
+        self.client = Client()
+        self.client.login(email='admin-intervals@example.com', password='testpass123')
+
+    @patch('integrations.admin.sync_connection.delay')
+    def test_admin_action_enqueues_initial_sync(self, mock_delay):
+        inactive = IntervalsConnection.objects.create(
+            profile=Profile.objects.create_user(email='inactive@example.com', password='x'),
+            api_key='k',
+            is_active=False,
+        )
+        url = reverse('admin:integrations_intervalsconnection_changelist')
+        response = self.client.post(url, {
+            'action': 'enqueue_initial_sync',
+            '_selected_action': [str(self.connection.pk), str(inactive.pk)],
+        })
+        self.assertEqual(response.status_code, 302)
+        mock_delay.assert_called_once_with(self.connection.pk, initial=True)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
