@@ -60,7 +60,7 @@ export function sourceLabel(source) {
 }
 
 export function sourceIcon(source) {
-  if (source === 'garmin') return '/source-garmin.svg'
-  if (source === 'intervals') return '/source-intervals.svg'
-  return '/source-upload.svg'
+  if (source === 'garmin') return '/static/img/source-garmin.svg'
+  if (source === 'intervals') return '/static/img/source-intervals.svg'
+  return '/static/img/source-upload.svg'
 }
