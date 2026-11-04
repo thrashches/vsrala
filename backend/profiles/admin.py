@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from .models import FollowRequest, Profile
+from .models import FollowRequest, Profile, ProfileMetricSample
 from .photo_preview import apply_photo_preview, clear_photo_preview
 from .tasks import generate_photo_previews_for_profiles
 
@@ -69,3 +69,12 @@ class FollowRequestAdmin(admin.ModelAdmin):
     list_display = ('from_user', 'to_user', 'created_at')
     search_fields = ('from_user__email', 'to_user__email')
     raw_id_fields = ('from_user', 'to_user')
+
+
+@admin.register(ProfileMetricSample)
+class ProfileMetricSampleAdmin(admin.ModelAdmin):
+    list_display = ('profile', 'metric', 'recorded_on', 'value', 'source', 'updated_at')
+    list_filter = ('metric', 'source')
+    search_fields = ('profile__email', 'external_key')
+    raw_id_fields = ('profile',)
+    date_hierarchy = 'recorded_on'

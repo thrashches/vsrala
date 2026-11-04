@@ -23,6 +23,7 @@ from activities.comments import (
 from activities.leaderboard import VALID_METRICS, VALID_WEEKS, weekly_leaders
 from activities.models import Activity, ActivityComment, ActivityType
 from activities.reactions import reaction_summary_for_activities, toggle_reaction
+from activities.user_stats import build_user_stats, metric_series_for_year
 from activities.year_stats import build_year_stats
 from activities.zone_distribution import compute_zone_distribution, stream_has_data
 from api.permissions import (
@@ -598,6 +599,52 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class MeStatsView(APIView):
+    @extend_schema(
+        tags=['me'],
+        parameters=[
+            OpenApiParameter('year', OpenApiTypes.INT, required=False),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+        summary='Статистика текущего пользователя',
+    )
+    def get(self, request):
+        year_raw = (request.query_params.get('year') or '').strip()
+        year = None
+        if year_raw:
+            try:
+                year = int(year_raw)
+            except ValueError as exc:
+                raise ValidationError('Invalid year') from exc
+            if year < 1970 or year > 2100:
+                raise ValidationError('Invalid year')
+
+        qs = Activity.objects.filter(profile=request.user)
+        stats = build_user_stats(qs, year=year)
+        # Ensure VO2max from activities is available even before next integration sync.
+        try:
+            from datetime import date as date_cls
+
+            from integrations.metric_history import backfill_vo2max_from_activities
+
+            y = stats['year']
+            backfill_vo2max_from_activities(
+                request.user,
+                date_cls(y, 1, 1),
+                date_cls(y, 12, 31),
+            )
+        except Exception:
+            pass
+        metrics = metric_series_for_year(request.user, stats['year'])
+        return Response({
+            'year': stats['year'],
+            'years': stats['years'],
+            'totals': stats['totals'],
+            'by_type': stats['by_type'],
+            'metrics': metrics,
+        })
 
 
 class MePasswordView(APIView):

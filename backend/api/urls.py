@@ -67,6 +67,7 @@ urlpatterns = [
     ),
 
     path('me/', views.MeView.as_view(), name='api_me'),
+    path('me/stats/', views.MeStatsView.as_view(), name='api_me_stats'),
     path('me/password/', views.MePasswordView.as_view(), name='api_me_password'),
     path('me/delete/', views.MeDeleteView.as_view(), name='api_me_delete'),
     path(

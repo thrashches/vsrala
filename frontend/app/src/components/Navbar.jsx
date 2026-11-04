@@ -47,6 +47,9 @@ export default function Navbar() {
             <NavLink to="/routes/" className={navClass}>
               Маршруты
             </NavLink>
+            <NavLink to="/stats/" className={navClass}>
+              Статистика
+            </NavLink>
           </div>
         </div>
         <div className="flex items-center gap-2">

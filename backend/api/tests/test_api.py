@@ -1,11 +1,14 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone as dj_timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from activities.models import Activity, ActivityType
-from profiles.models import Follow, FollowRequest, Profile
+from profiles.metrics import upsert_metric_sample
+from profiles.models import Follow, FollowRequest, Profile, ProfileMetricSample
 from routes.models import Route
 
 
@@ -195,6 +198,69 @@ class ApiPeopleMeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('new-secret-456'))
+
+    def test_me_stats(self):
+        cycling, _ = ActivityType.objects.get_or_create(
+            slug='road_cycling',
+            defaults={'name': 'Шоссейный велосипед', 'sort_order': 10},
+        )
+        running, _ = ActivityType.objects.get_or_create(
+            slug='running',
+            defaults={'name': 'Бег', 'sort_order': 50},
+        )
+        year = dj_timezone.localdate().year
+        Activity.objects.create(
+            profile=self.user,
+            title='Ride',
+            activity_type=cycling,
+            started_at=datetime(year, 3, 1, 10, 0, tzinfo=timezone.utc),
+            distance=Decimal('40'),
+            duration=timedelta(hours=1, minutes=30),
+            elevation_gain=Decimal('300'),
+            avg_moving_speed=Decimal('26.5'),
+        )
+        Activity.objects.create(
+            profile=self.user,
+            title='Run',
+            activity_type=running,
+            started_at=datetime(year, 4, 1, 8, 0, tzinfo=timezone.utc),
+            distance=Decimal('10'),
+            duration=timedelta(minutes=50),
+            elevation_gain=Decimal('50'),
+            avg_moving_speed=Decimal('12'),
+            vo2max=Decimal('51.0'),
+        )
+        upsert_metric_sample(
+            self.user,
+            metric=ProfileMetricSample.Metric.FTP,
+            recorded_on=date(year, 2, 1),
+            value=240,
+            source=ProfileMetricSample.Source.GARMIN,
+            update_profile_ftp=False,
+        )
+        upsert_metric_sample(
+            self.user,
+            metric=ProfileMetricSample.Metric.WEIGHT,
+            recorded_on=date(year, 2, 15),
+            value='72.2',
+            source=ProfileMetricSample.Source.INTERVALS,
+            update_profile_ftp=False,
+        )
+
+        response = self.client.get('/api/me/stats/', {'year': year})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['year'], year)
+        self.assertIn(year, response.data['years'])
+        self.assertEqual(response.data['totals']['count'], 2)
+        self.assertEqual(len(response.data['by_type']), 2)
+        self.assertTrue(response.data['metrics']['ftp'])
+        self.assertTrue(response.data['metrics']['weight'])
+        self.assertIn('vo2max', response.data['metrics'])
+
+    def test_me_stats_requires_auth(self):
+        self.client.credentials()
+        response = self.client.get('/api/me/stats/')
+        self.assertEqual(response.status_code, 401)
 
 
 class ApiRoutesLeadersTests(TestCase):

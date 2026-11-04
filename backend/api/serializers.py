@@ -446,6 +446,21 @@ class MeSerializer(serializers.ModelSerializer):
                 apply_photo_preview(instance)
             else:
                 clear_photo_preview(instance)
+        if instance.ftp and instance.ftp != old_ftp:
+            from django.utils import timezone as dj_timezone
+
+            from profiles.metrics import upsert_metric_sample
+            from profiles.models import ProfileMetricSample
+
+            upsert_metric_sample(
+                instance,
+                metric=ProfileMetricSample.Metric.FTP,
+                recorded_on=dj_timezone.localdate(),
+                value=instance.ftp,
+                source=ProfileMetricSample.Source.PROFILE,
+                external_key='settings',
+                update_profile_ftp=False,
+            )
         return instance
 
 

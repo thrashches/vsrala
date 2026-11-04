@@ -177,3 +177,30 @@ class GarminClient:
 
     def get_cycling_ftp(self) -> Any:
         return self.get('/biometric-service/latestFunctionalThresholdPower/CYCLING')
+
+    def get_weight_range(self, start_date: str, end_date: str) -> Any:
+        return self.get(
+            '/weight-service/weight/dateRange',
+            params={'startDate': start_date, 'endDate': end_date},
+        )
+
+    def get_biometric_stats(
+        self,
+        start_date: str,
+        end_date: str,
+        *,
+        aggregation: str = 'daily',
+        user_first_day: str = 'monday',
+    ) -> Any:
+        return self.get(
+            '/biometric-service/stats',
+            params={
+                'aggregation': aggregation,
+                'userFirstDay': user_first_day,
+                'startDate': start_date,
+                'endDate': end_date,
+            },
+        )
+
+    def get_maxmet_daily(self, start_date: str, end_date: str) -> Any:
+        return self.get(f'/metrics-service/metrics/maxmet/daily/{start_date}/{end_date}')

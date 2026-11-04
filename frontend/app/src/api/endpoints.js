@@ -52,6 +52,13 @@ export const peopleApi = {
   removeFollower: (id) => api(`/people/${id}/remove-follower/`, { method: 'POST' }),
 }
 
+export const statsApi = {
+  me: (params = {}) => {
+    const q = new URLSearchParams(params).toString()
+    return api(`/me/stats/${q ? `?${q}` : ''}`)
+  },
+}
+
 export const meApi = {
   get: () => api('/me/'),
   update: (bodyOrForm) => {

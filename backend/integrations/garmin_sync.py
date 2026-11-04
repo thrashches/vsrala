@@ -148,6 +148,16 @@ def sync_connection(connection: GarminConnection, *, initial: bool = False) -> i
         if activity is not None and getattr(activity, '_was_created', False):
             created += 1
 
+    try:
+        from .metric_history import sync_garmin_metric_history
+
+        sync_garmin_metric_history(connection, client, initial=initial)
+    except Exception:
+        logger.exception(
+            'Garmin metric history sync failed for connection %s',
+            connection.pk,
+        )
+
     connection.last_synced_at = dj_timezone.now()
     connection.last_error = ''
     update_fields = ['last_synced_at', 'last_error', 'updated_at']
@@ -470,6 +480,19 @@ def sync_power_zones(connection: GarminConnection) -> dict[str, Any]:
         profile.ftp = ftp
         update_fields.append('ftp')
     profile.save(update_fields=update_fields)
+    if ftp:
+        from profiles.metrics import upsert_metric_sample
+        from profiles.models import ProfileMetricSample
+
+        upsert_metric_sample(
+            profile,
+            metric=ProfileMetricSample.Metric.FTP,
+            recorded_on=dj_timezone.localdate(),
+            value=ftp,
+            source=ProfileMetricSample.Source.GARMIN,
+            external_key='sync_power_zones',
+            update_profile_ftp=False,
+        )
     return {'zones': zones, 'ftp': ftp}
 
 

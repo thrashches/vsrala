@@ -62,6 +62,32 @@ class IntervalsClient:
             raise IntervalsApiError('Неожиданный формат списка активностей')
         return data
 
+    def list_wellness(self, oldest: str, newest: str) -> list[dict[str, Any]]:
+        response = self._request(
+            'GET',
+            f'/athlete/{self.athlete_id}/wellness',
+            params={'oldest': oldest, 'newest': newest},
+        )
+        self._raise_for_status(response, 'Wellness')
+        data = response.json()
+        if data is None:
+            return []
+        if not isinstance(data, list):
+            raise IntervalsApiError('Неожиданный формат wellness')
+        return data
+
+    def get_sport_settings(self) -> list[dict[str, Any]]:
+        response = self._request('GET', f'/athlete/{self.athlete_id}/sport-settings')
+        self._raise_for_status(response, 'Sport settings')
+        data = response.json()
+        if data is None:
+            return []
+        if isinstance(data, dict):
+            return [data]
+        if not isinstance(data, list):
+            raise IntervalsApiError('Неожиданный формат sport-settings')
+        return data
+
     def download_original_file(self, activity_id: str) -> bytes:
         """Download original activity file (gzip-compressed) and decompress."""
         response = self._request('GET', f'/activity/{activity_id}/file')

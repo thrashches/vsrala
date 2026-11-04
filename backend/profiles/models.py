@@ -156,3 +156,50 @@ class FollowRequest(models.Model):
 
     def __str__(self):
         return f'{self.from_user.email} → {self.to_user.email}'
+
+
+class ProfileMetricSample(models.Model):
+    class Metric(models.TextChoices):
+        FTP = 'ftp', 'FTP'
+        WEIGHT = 'weight', 'Вес'
+        VO2MAX = 'vo2max', 'VO2max'
+
+    class Source(models.TextChoices):
+        GARMIN = 'garmin', 'Garmin'
+        INTERVALS = 'intervals', 'Intervals.icu'
+        ACTIVITY = 'activity', 'Активность'
+        PROFILE = 'profile', 'Профиль'
+
+    class Meta:
+        verbose_name = 'снимок метрики'
+        verbose_name_plural = 'снимки метрик'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['profile', 'metric', 'recorded_on', 'source'],
+                name='profiles_metric_sample_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['profile', 'metric', 'recorded_on'],
+                name='profiles_metric_sample_idx',
+            ),
+        ]
+        ordering = ['recorded_on', 'id']
+
+    profile = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name='metric_samples',
+        verbose_name='спортсмен',
+    )
+    metric = models.CharField(max_length=16, choices=Metric.choices, verbose_name='метрика')
+    recorded_on = models.DateField(verbose_name='дата')
+    value = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='значение')
+    source = models.CharField(max_length=16, choices=Source.choices, verbose_name='источник')
+    external_key = models.CharField(max_length=128, blank=True, verbose_name='внешний ключ')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='создано')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='обновлено')
+
+    def __str__(self):
+        return f'{self.profile_id} {self.metric}={self.value} @ {self.recorded_on}'

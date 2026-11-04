@@ -14,10 +14,11 @@ import { getRelativePosition } from 'chart.js/helpers'
 Chart.register(LineController, LineElement, PointElement, LinearScale, Filler, Legend, Tooltip)
 
 function formatValue(v) {
-  if (v == null || Number.isNaN(v)) return ''
-  return Math.round(v * 10) / 10 === Math.round(v)
-    ? String(Math.round(v))
-    : String(Math.round(v * 10) / 10)
+  const n = typeof v === 'number' ? v : Number(v)
+  if (v == null || !Number.isFinite(n)) return ''
+  return Math.round(n * 10) / 10 === Math.round(n)
+    ? String(Math.round(n))
+    : String(Math.round(n * 10) / 10)
 }
 
 /** Pace as decimal minutes/km → ``m:ss``. */
@@ -157,61 +158,66 @@ function createOverlaysPlugin(getSyncTime) {
   return {
     id: 'chartOverlays',
     afterDatasetsDraw(chart) {
-      const ctx = chart.ctx
-      const area = chart.chartArea
-      const xScale = chart.scales.x
-      const yScale = chart.scales.y
-      if (!area || !xScale || !yScale) return
+      try {
+        const ctx = chart.ctx
+        const area = chart.chartArea
+        const xScale = chart.scales.x
+        const yScale = chart.scales.y
+        if (!area || !xScale || !yScale) return
 
-      const opts = chart.options.plugins?.chartOverlays || {}
-      const avg = opts.avg
-      const color = opts.color || '#333'
-      const series = opts.series || chart.data.datasets[0]?.data || []
-      const formatY = opts.formatY || formatValue
+        const opts = chart.options.plugins?.chartOverlays || {}
+        const avg = opts.avg
+        const color = opts.color || '#333'
+        const series = opts.series || chart.data.datasets[0]?.data || []
+        const formatY = opts.formatY || formatValue
+        const avgNum = typeof avg === 'number' ? avg : Number(avg)
 
-      if (avg != null) {
-        const avgY = yScale.getPixelForValue(avg)
-        if (avgY >= area.top && avgY <= area.bottom) {
-          ctx.save()
-          ctx.font = '11px system-ui, sans-serif'
-          ctx.fillStyle = 'rgba(28, 28, 30, 0.55)'
-          ctx.textAlign = 'right'
-          ctx.textBaseline = 'bottom'
-          ctx.fillText(`ср. ${formatY(avg)}`, area.right - 4, avgY - 2)
-          ctx.restore()
+        if (avg != null && Number.isFinite(avgNum)) {
+          const avgY = yScale.getPixelForValue(avgNum)
+          if (avgY >= area.top && avgY <= area.bottom) {
+            ctx.save()
+            ctx.font = '11px system-ui, sans-serif'
+            ctx.fillStyle = 'rgba(28, 28, 30, 0.55)'
+            ctx.textAlign = 'right'
+            ctx.textBaseline = 'bottom'
+            ctx.fillText(`ср. ${formatY(avgNum)}`, area.right - 4, avgY - 2)
+            ctx.restore()
+          }
         }
+
+        const syncTime = getSyncTime()
+        if (syncTime === null || syncTime === undefined) return
+        const x = xScale.getPixelForValue(syncTime)
+        if (x < area.left || x > area.right) return
+
+        ctx.save()
+        ctx.beginPath()
+        ctx.moveTo(x, area.top)
+        ctx.lineTo(x, area.bottom)
+        ctx.lineWidth = 1
+        ctx.strokeStyle = 'rgba(28, 28, 30, 0.55)'
+        ctx.stroke()
+        ctx.restore()
+
+        const value = valueAtTime(series, syncTime)
+        if (value == null || !Number.isFinite(Number(value))) return
+        const py = yScale.getPixelForValue(value)
+        if (py < area.top || py > area.bottom) return
+
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(x, py, 4.5, 0, Math.PI * 2)
+        ctx.fillStyle = color
+        ctx.fill()
+        ctx.lineWidth = 2
+        ctx.strokeStyle = '#fff'
+        ctx.stroke()
+        ctx.restore()
+
+        drawValueBadge(ctx, x, py, formatY(value), color, area)
+      } catch {
+        // Never let chart overlay failures blank the activity page.
       }
-
-      const syncTime = getSyncTime()
-      if (syncTime === null) return
-      const x = xScale.getPixelForValue(syncTime)
-      if (x < area.left || x > area.right) return
-
-      ctx.save()
-      ctx.beginPath()
-      ctx.moveTo(x, area.top)
-      ctx.lineTo(x, area.bottom)
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(28, 28, 30, 0.55)'
-      ctx.stroke()
-      ctx.restore()
-
-      const value = valueAtTime(series, syncTime)
-      if (value == null) return
-      const py = yScale.getPixelForValue(value)
-      if (py < area.top || py > area.bottom) return
-
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(x, py, 4.5, 0, Math.PI * 2)
-      ctx.fillStyle = color
-      ctx.fill()
-      ctx.lineWidth = 2
-      ctx.strokeStyle = '#fff'
-      ctx.stroke()
-      ctx.restore()
-
-      drawValueBadge(ctx, x, py, formatY(value), color, area)
     },
   }
 }

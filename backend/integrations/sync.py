@@ -117,6 +117,21 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
         if activity is not None and getattr(activity, '_was_created', False):
             created += 1
 
+    try:
+        from .metric_history import sync_intervals_metric_history
+
+        sync_intervals_metric_history(
+            connection,
+            client,
+            initial=initial,
+            remote_activities=remote_activities,
+        )
+    except Exception:
+        logger.exception(
+            'Intervals metric history sync failed for connection %s',
+            connection.pk,
+        )
+
     connection.last_synced_at = dj_timezone.now()
     connection.last_error = ''
     update_fields = ['last_synced_at', 'last_error', 'updated_at']
