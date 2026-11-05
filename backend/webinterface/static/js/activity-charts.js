@@ -196,6 +196,11 @@
 
   var overlaysPlugin = {
     id: 'chartOverlays',
+    // Keep formatY/series off Chart.js option proxies (scriptable recursion).
+    descriptors: {
+      _scriptable: false,
+      _indexable: false,
+    },
     afterDatasetsDraw: function (chart) {
       var ctx = chart.ctx;
       var area = chart.chartArea;
@@ -203,13 +208,11 @@
       var yScale = chart.scales.y;
       if (!area || !xScale || !yScale) return;
 
-      var opts = chart.options.plugins && chart.options.plugins.chartOverlays
-        ? chart.options.plugins.chartOverlays
-        : {};
+      var opts = chart.$activityOverlays || {};
       var avg = opts.avg;
       var color = opts.color || '#333';
-      var series = opts.series || ((chart.data.datasets[0] && chart.data.datasets[0].data) || []);
-      var formatY = opts.formatY || formatValue;
+      var series = opts.series || [];
+      var formatY = typeof opts.formatY === 'function' ? opts.formatY : formatValue;
 
       if (avg != null) {
         var avgY = yScale.getPixelForValue(avg);
@@ -404,7 +407,7 @@
       };
     }
 
-    return new Chart(canvas, {
+    var chart = new Chart(canvas, {
       type: 'line',
       data: { datasets: datasets },
       options: {
@@ -420,13 +423,14 @@
         },
         plugins: {
           legend: { display: false },
-          chartOverlays: { avg: s.avg, color: color, series: data, formatY: formatY },
           tooltip: { enabled: false },
         },
         scales: scales,
       },
       plugins: [overlaysPlugin],
     });
+    chart.$activityOverlays = { avg: s.avg, color: color, series: data, formatY: formatY };
+    return chart;
   }
 
   function init() {

@@ -157,6 +157,11 @@ function drawValueBadge(ctx, x, y, text, color, area) {
 function createOverlaysPlugin(getSyncTime) {
   return {
     id: 'chartOverlays',
+    // Keep formatY/series off Chart.js option proxies (scriptable recursion).
+    descriptors: {
+      _scriptable: false,
+      _indexable: false,
+    },
     afterDatasetsDraw(chart) {
       try {
         const ctx = chart.ctx
@@ -165,11 +170,12 @@ function createOverlaysPlugin(getSyncTime) {
         const yScale = chart.scales.y
         if (!area || !xScale || !yScale) return
 
-        const opts = chart.options.plugins?.chartOverlays || {}
+        // Read overlay config from the chart instance, not proxied options.
+        const opts = chart.$activityOverlays || {}
         const avg = opts.avg
         const color = opts.color || '#333'
-        const series = opts.series || chart.data.datasets[0]?.data || []
-        const formatY = opts.formatY || formatValue
+        const series = opts.series || []
+        const formatY = typeof opts.formatY === 'function' ? opts.formatY : formatValue
         const avgNum = typeof avg === 'number' ? avg : Number(avg)
 
         if (avg != null && Number.isFinite(avgNum)) {
@@ -334,7 +340,7 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime, cha
     }
   }
 
-  return new Chart(canvas, {
+  const chart = new Chart(canvas, {
     type: 'line',
     data: { datasets },
     options: {
@@ -346,13 +352,15 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime, cha
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       plugins: {
         legend: { display: false },
-        chartOverlays: { avg: s.avg, color, series: data, formatY },
         tooltip: { enabled: false },
       },
       scales,
     },
     plugins: [createOverlaysPlugin(getSyncTime)],
   })
+  // Store outside Chart.js option proxies so formatY/series stay plain values.
+  chart.$activityOverlays = { avg: s.avg, color, series: data, formatY }
+  return chart
 }
 
 const SPECS = [
@@ -402,7 +410,13 @@ export default function ActivityCharts({ streams, durationSec = 0, usePace = fal
       if (rafRef.current != null) return
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null
-        chartsRef.current.forEach((c) => c.draw())
+        chartsRef.current.forEach((c) => {
+          try {
+            c.draw()
+          } catch {
+            // Ignore per-chart redraw failures so sync keeps working.
+          }
+        })
       })
     }
 
