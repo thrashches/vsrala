@@ -90,6 +90,38 @@ def find_activity_by_external_id(profile, source: str, external_id: str) -> Opti
     return None
 
 
+def known_external_ids(profile, source: str) -> set[str]:
+    """Prefetch all external ids for a source (canonical + external_refs)."""
+    ids: set[str] = set(
+        str(value)
+        for value in Activity.objects.filter(
+            profile=profile,
+            external_source=source,
+        ).exclude(external_id='').exclude(external_id__isnull=True).values_list('external_id', flat=True)
+    )
+    for refs in (
+        Activity.objects.filter(profile=profile)
+        .exclude(external_refs={})
+        .exclude(external_refs=None)
+        .values_list('external_refs', flat=True)
+    ):
+        if isinstance(refs, dict) and refs.get(source):
+            ids.add(str(refs[source]))
+    return ids
+
+
+def link_external_id_only(
+    existing: Activity,
+    *,
+    source: str,
+    external_id: str,
+) -> Activity:
+    """Attach an external id without rewriting metrics/track."""
+    set_external_ref(existing, source, external_id)
+    existing.save(update_fields=['external_source', 'external_id', 'external_refs'])
+    return existing
+
+
 def find_duplicate_activity(
     profile,
     *,

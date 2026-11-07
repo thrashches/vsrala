@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Any, Optional
@@ -14,12 +14,13 @@ from django.utils import timezone as dj_timezone
 from activities.activity_types import GARMIN_TYPE_MAP, resolve_garmin_type
 from activities.models import Activity
 from activities.parsers import TrackParseError, parse_track
+from activities.tasks import enqueue_activity_enrichment
 from profiles.zones import POWER_ZONE_NAMES, normalize_zones
 
 from .dedup import (
     SOURCE_GARMIN,
-    find_activity_by_external_id,
     find_duplicate_activity,
+    known_external_ids,
     merge_activity,
 )
 from .garmin_client import (
@@ -36,6 +37,10 @@ EXTERNAL_SOURCE = SOURCE_GARMIN
 
 # Backwards-compatible alias for tests/imports.
 TYPE_NAME_MAP = GARMIN_TYPE_MAP
+
+IMPORT_LIMIT_PER_RUN = 8
+INITIAL_LOOKBACK_DAYS = 183
+INITIAL_CHUNK_DAYS = 14
 
 
 def _client_for_connection(connection: GarminConnection) -> GarminClient:
@@ -109,13 +114,20 @@ def sync_connection(connection: GarminConnection, *, initial: bool = False) -> i
 
     today = dj_timezone.localdate()
     if initial or not connection.initial_sync_done:
-        oldest = today - timedelta(days=183)
         initial = True
+        full_oldest = today - timedelta(days=INITIAL_LOOKBACK_DAYS)
+        # During initial sync, last_synced_at stores the end date of the last completed chunk.
+        if connection.last_synced_at and connection.last_synced_at.date() > full_oldest:
+            oldest = connection.last_synced_at.date()
+        else:
+            oldest = full_oldest
+        newest = min(oldest + timedelta(days=INITIAL_CHUNK_DAYS), today + timedelta(days=1))
     elif connection.last_synced_at:
         oldest = (connection.last_synced_at - timedelta(days=1)).date()
+        newest = today + timedelta(days=1)
     else:
         oldest = today - timedelta(days=7)
-    newest = today + timedelta(days=1)
+        newest = today + timedelta(days=1)
 
     try:
         client = _client_for_connection(connection)
@@ -130,12 +142,19 @@ def sync_connection(connection: GarminConnection, *, initial: bool = False) -> i
         raise
 
     created = 0
+    imported = 0
+    has_more = False
+    known_ids = known_external_ids(connection.profile, EXTERNAL_SOURCE)
+
     for remote in remote_activities:
         activity_id = str(remote.get('activityId') or remote.get('activityIdStr') or '')
         if not activity_id:
             continue
-        if find_activity_by_external_id(connection.profile, EXTERNAL_SOURCE, activity_id):
+        if activity_id in known_ids:
             continue
+        if imported >= IMPORT_LIMIT_PER_RUN:
+            has_more = True
+            break
         try:
             activity = import_remote_activity(connection, client, remote)
         except Exception:
@@ -145,27 +164,54 @@ def sync_connection(connection: GarminConnection, *, initial: bool = False) -> i
                 connection.profile_id,
             )
             continue
-        if activity is not None and getattr(activity, '_was_created', False):
+        if activity is None:
+            continue
+        known_ids.add(activity_id)
+        imported += 1
+        if getattr(activity, '_was_created', False):
             created += 1
 
-    try:
-        from .metric_history import sync_garmin_metric_history
+    if has_more:
+        connection.last_error = ''
+        connection.save(update_fields=['last_error', 'updated_at'])
+        _enqueue_continue(connection.pk, initial=initial)
+        return created
 
-        sync_garmin_metric_history(connection, client, initial=initial)
-    except Exception:
-        logger.exception(
-            'Garmin metric history sync failed for connection %s',
-            connection.pk,
-        )
+    if initial:
+        chunk_complete_end = newest if isinstance(newest, date) else newest
+        more_chunks = chunk_complete_end < (today + timedelta(days=1))
+        if more_chunks:
+            # Checkpoint: next run resumes from this chunk end.
+            connection.last_synced_at = dj_timezone.make_aware(
+                datetime.combine(chunk_complete_end, datetime.min.time()),
+                dj_timezone.get_current_timezone(),
+            )
+            connection.last_error = ''
+            connection.save(update_fields=['last_synced_at', 'last_error', 'updated_at'])
+            _enqueue_continue(connection.pk, initial=True)
+            return created
+
+        connection.initial_sync_done = True
+        connection.last_synced_at = dj_timezone.now()
+        connection.last_error = ''
+        connection.save(update_fields=[
+            'initial_sync_done', 'last_synced_at', 'last_error', 'updated_at',
+        ])
+        return created
 
     connection.last_synced_at = dj_timezone.now()
     connection.last_error = ''
-    update_fields = ['last_synced_at', 'last_error', 'updated_at']
-    if initial:
-        connection.initial_sync_done = True
-        update_fields.append('initial_sync_done')
-    connection.save(update_fields=update_fields)
+    connection.save(update_fields=['last_synced_at', 'last_error', 'updated_at'])
     return created
+
+
+def _enqueue_continue(connection_id: int, *, initial: bool) -> None:
+    try:
+        from .tasks import sync_garmin_connection
+
+        sync_garmin_connection.delay(connection_id, initial=initial)
+    except Exception:
+        logger.exception('Garmin sync: failed to enqueue continuation for %s', connection_id)
 
 
 def _list_all_activities(
@@ -275,10 +321,7 @@ def import_remote_activity(
         )
         existing._was_created = False  # type: ignore[attr-defined]
         if prefer_track_refresh(existing, field_values):
-            from activities.map_preview import apply_map_preview
-            from activities.zone_timeline import apply_zone_timeline
-            apply_map_preview(existing)
-            apply_zone_timeline(existing)
+            enqueue_activity_enrichment(existing.pk)
         return existing
 
     activity = Activity(
@@ -306,10 +349,7 @@ def import_remote_activity(
         logger.info('Garmin sync: duplicate %s skipped', activity_id)
         return None
 
-    from activities.map_preview import apply_map_preview
-    from activities.zone_timeline import apply_zone_timeline
-    apply_map_preview(activity)
-    apply_zone_timeline(activity)
+    enqueue_activity_enrichment(activity.pk)
     activity._was_created = True  # type: ignore[attr-defined]
     return activity
 

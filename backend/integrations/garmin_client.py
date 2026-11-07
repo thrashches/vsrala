@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -14,6 +15,9 @@ DEFAULT_BASE_URL = 'https://personal.connectapi.garmin.com'
 TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
 # Refresh when less than 1 hour remains (matches official client).
 TOKEN_REFRESH_WINDOW_SECONDS = 60 * 60
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_SECONDS = 1.5
 
 
 class GarminApiError(Exception):
@@ -103,12 +107,25 @@ class GarminClient:
     ) -> requests.Response:
         url = f'{self.base_url}{path}'
         headers = {**self._headers, 'Accept': accept}
-        try:
-            return self.session.request(
-                method, url, headers=headers, timeout=self.timeout, **kwargs,
-            )
-        except requests.RequestException as exc:
-            raise GarminApiError(f'Сеть: {exc}') from exc
+        last_exc: Optional[Exception] = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                response = self.session.request(
+                    method, url, headers=headers, timeout=self.timeout, **kwargs,
+                )
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt >= _MAX_RETRIES:
+                    raise GarminApiError(f'Сеть: {exc}') from exc
+                time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+
+            if response.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES:
+                time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            return response
+
+        raise GarminApiError(f'Сеть: {last_exc}')
 
     def _raise_for_status(self, response: requests.Response, context: str) -> None:
         if response.ok:

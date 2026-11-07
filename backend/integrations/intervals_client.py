@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import logging
+import time
 from typing import Any, Optional
 
 import requests
@@ -9,6 +10,9 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE_URL = 'https://intervals.icu/api/v1'
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_SECONDS = 1.5
 
 
 class IntervalsApiError(Exception):
@@ -30,11 +34,23 @@ class IntervalsClient:
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
         url = f'{BASE_URL}{path}'
-        try:
-            response = self.session.request(method, url, timeout=self.timeout, **kwargs)
-        except requests.RequestException as exc:
-            raise IntervalsApiError(f'Сеть: {exc}') from exc
-        return response
+        last_exc: Optional[Exception] = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                response = self.session.request(method, url, timeout=self.timeout, **kwargs)
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt >= _MAX_RETRIES:
+                    raise IntervalsApiError(f'Сеть: {exc}') from exc
+                time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+
+            if response.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES:
+                time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            return response
+
+        raise IntervalsApiError(f'Сеть: {last_exc}')
 
     def _raise_for_status(self, response: requests.Response, context: str) -> None:
         if response.ok:

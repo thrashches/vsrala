@@ -143,9 +143,8 @@ class SyncServiceTest(TestCase):
         self.assertFalse(self.connection.is_active)
         self.assertEqual(self.connection.api_key, '')
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
-    def test_import_remote_activity_creates_activity(self, _map, _zone):
+    @patch('integrations.sync.enqueue_activity_enrichment')
+    def test_import_remote_activity_creates_activity(self, mock_enrich):
         client = MagicMock()
         client.download_original_file.return_value = self.fit_bytes
         remote = {
@@ -162,10 +161,10 @@ class SyncServiceTest(TestCase):
         self.assertEqual(activity.title, 'Morning Ride')
         self.assertEqual(activity.activity_type.name, 'Шоссейный велосипед')
         self.assertTrue(activity.track_points)
+        mock_enrich.assert_called_once_with(activity.pk)
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
-    def test_import_idempotent_by_external_id(self, _map, _zone):
+    @patch('integrations.sync.enqueue_activity_enrichment')
+    def test_import_idempotent_by_external_id(self, _enrich):
         client = MagicMock()
         client.download_original_file.return_value = self.fit_bytes
         remote = {'id': 'i200', 'name': 'Ride', 'type': 'Ride', 'file_type': 'fit'}
@@ -182,11 +181,11 @@ class SyncServiceTest(TestCase):
 
         self.assertEqual(created, 0)
         self.assertEqual(Activity.objects.filter(external_id='i200').count(), 1)
+        client.download_original_file.assert_called_once()
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
+    @patch('integrations.sync.enqueue_activity_enrichment')
     @patch('integrations.sync.IntervalsClient')
-    def test_sync_connection_initial(self, mock_client_cls, _map, _zone):
+    def test_sync_connection_initial(self, mock_client_cls, _enrich):
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
         mock_client.list_activities.return_value = [
@@ -210,6 +209,43 @@ class SyncServiceTest(TestCase):
         created_again = sync_connection(self.connection, initial=False)
         self.assertEqual(created_again, 0)
         self.assertEqual(Activity.objects.filter(external_id='i300').count(), 1)
+
+    @patch('integrations.sync.IntervalsClient')
+    def test_sync_links_without_download_when_duplicate_exists(self, mock_client_cls):
+        from activities.parsers import parse_track
+        from io import BytesIO
+
+        parsed = parse_track(BytesIO(self.fit_bytes), filename='sample.fit')
+        existing = Activity.objects.create(
+            profile=self.profile,
+            title='Garmin ride',
+            external_source='garmin',
+            external_id='g1',
+            external_refs={'garmin': 'g1'},
+            started_at=parsed.started_at,
+            distance=parsed.distance_km,
+            duration=parsed.duration,
+            track_points=parsed.points or [[55.0, 37.0]],
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        remote = {
+            'id': 'i900',
+            'name': 'Intervals copy',
+            'type': 'Ride',
+            'file_type': 'fit',
+            'start_date_local': parsed.started_at.isoformat(),
+            'moving_time': parsed.duration.total_seconds(),
+            'distance': float(parsed.distance_km) * 1000,
+        }
+        mock_client.list_activities.return_value = [remote]
+
+        created = sync_connection(self.connection, initial=False)
+        self.assertEqual(created, 0)
+        mock_client.download_original_file.assert_not_called()
+        mock_client.download_fit_file.assert_not_called()
+        existing.refresh_from_db()
+        self.assertEqual(existing.external_refs.get('intervals'), 'i900')
 
     @patch('integrations.tasks.sync_connection.delay')
     def test_sync_all_connections_enqueues_ready(self, mock_delay):
@@ -489,9 +525,8 @@ class GarminSyncServiceTest(TestCase):
         self.assertEqual(self.connection.api_key, '')
         self.assertEqual(self.connection.access_token, '')
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
-    def test_import_creates_garmin_activity(self, _map, _zone):
+    @patch('integrations.garmin_sync.enqueue_activity_enrichment')
+    def test_import_creates_garmin_activity(self, mock_enrich):
         client = MagicMock()
         client.get_activity.return_value = {
             'summaryDTO': {
@@ -517,10 +552,11 @@ class GarminSyncServiceTest(TestCase):
         self.assertEqual(activity.calories, 650)
         self.assertEqual(activity.device_name, 'Edge 840')
         self.assertEqual(float(activity.aerobic_training_effect), 3.2)
+        mock_enrich.assert_called_once_with(activity.pk)
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
-    def test_cross_source_dedup_intervals_then_garmin(self, _map, _zone):
+    @patch('integrations.garmin_sync.enqueue_activity_enrichment')
+    @patch('integrations.sync.enqueue_activity_enrichment')
+    def test_cross_source_dedup_intervals_then_garmin(self, _i_enrich, _g_enrich):
         intervals_conn = IntervalsConnection.objects.create(
             profile=self.profile,
             api_key='ik',
@@ -562,9 +598,9 @@ class GarminSyncServiceTest(TestCase):
         self.assertEqual(second.external_refs[SOURCE_GARMIN], '888')
         self.assertEqual(second.calories, 700)
 
-    @patch('activities.zone_timeline.apply_zone_timeline')
-    @patch('activities.map_preview.apply_map_preview')
-    def test_cross_source_dedup_garmin_then_intervals(self, _map, _zone):
+    @patch('integrations.garmin_sync.enqueue_activity_enrichment')
+    @patch('integrations.sync.enqueue_activity_enrichment')
+    def test_cross_source_dedup_garmin_then_intervals(self, _i_enrich, _g_enrich):
         garmin_client = MagicMock()
         garmin_client.get_activity.return_value = {
             'summaryDTO': {
@@ -725,6 +761,34 @@ class GarminSettingsViewTest(TestCase):
         result = sync_all_garmin_connections()
         self.assertEqual(result['enqueued'], 1)
         mock_delay.assert_called_once_with(conn.pk, initial=False)
+
+
+class GarminSyncQueueTest(TestCase):
+    @patch('integrations.tasks.sync_garmin_connection.delay')
+    def test_sync_all_garmin_enqueues_ready(self, mock_delay):
+        profile = Profile.objects.create_user(email='garmin-ready@example.com', password='x')
+        conn = GarminConnection.objects.create(
+            profile=profile,
+            api_key='key',
+            is_active=True,
+            initial_sync_done=True,
+        )
+        result = sync_all_garmin_connections()
+        self.assertEqual(result['enqueued'], 1)
+        mock_delay.assert_called_once_with(conn.pk, initial=False)
+
+    @patch('integrations.tasks.sync_garmin_connection.delay')
+    def test_sync_all_garmin_enqueues_unfinished_initial(self, mock_delay):
+        profile = Profile.objects.create_user(email='garmin-stuck@example.com', password='x')
+        stuck = GarminConnection.objects.create(
+            profile=profile,
+            api_key='key',
+            is_active=True,
+            initial_sync_done=False,
+        )
+        result = sync_all_garmin_connections()
+        self.assertEqual(result['enqueued'], 1)
+        mock_delay.assert_called_once_with(stuck.pk, initial=True)
 
 
 class ActivitySourceBadgeTest(TestCase):

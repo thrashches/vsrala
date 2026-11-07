@@ -7,8 +7,39 @@ from celery import shared_task
 from activities.map_preview import apply_map_preview
 from activities.models import Activity
 from activities.services import update_activity_types_from_fit
+from activities.zone_timeline import apply_zone_timeline
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def enrich_activity_after_import(activity_id: int) -> dict:
+    """Generate map preview and zone timeline after sync import (off hot path)."""
+    try:
+        activity = Activity.objects.get(pk=activity_id)
+    except Activity.DoesNotExist:
+        logger.warning('Activity %s not found for post-import enrichment', activity_id)
+        return {'ok': False, 'error': 'not_found'}
+
+    preview_ok = False
+    zones_ok = False
+    try:
+        preview_ok = bool(apply_map_preview(activity))
+    except Exception:
+        logger.exception('Map preview failed for activity %s', activity_id)
+    try:
+        zones_ok = bool(apply_zone_timeline(activity))
+    except Exception:
+        logger.exception('Zone timeline failed for activity %s', activity_id)
+    return {'ok': True, 'map_preview': preview_ok, 'zone_timeline': zones_ok}
+
+
+def enqueue_activity_enrichment(activity_id: int) -> None:
+    """Fire-and-forget enrichment; ignore broker errors during sync."""
+    try:
+        enrich_activity_after_import.delay(activity_id)
+    except Exception:
+        logger.exception('Failed to enqueue enrichment for activity %s', activity_id)
 
 
 @shared_task

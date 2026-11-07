@@ -17,8 +17,12 @@ from .models import GarminConnection, IntervalsConnection
 logger = logging.getLogger(__name__)
 
 INITIAL_LOOKBACK_DAYS = 365 * 3
-INCREMENTAL_LOOKBACK_DAYS = 90
+# Periodic metric sync lookback (activity sync is a separate beat task).
+INCREMENTAL_LOOKBACK_DAYS = 7
 CHUNK_DAYS = 90
+
+# Process-local skip list for Personal API endpoints that return 404.
+_UNSUPPORTED_GARMIN_METRICS: set[str] = set()
 
 
 def _to_decimal(value) -> Optional[Decimal]:
@@ -48,7 +52,8 @@ def _metric_window(*, initial: bool, last_synced_at) -> tuple[date, date]:
         oldest = today - timedelta(days=INITIAL_LOOKBACK_DAYS)
     elif last_synced_at:
         oldest = (last_synced_at - timedelta(days=1)).date()
-        oldest = min(oldest, today - timedelta(days=INCREMENTAL_LOOKBACK_DAYS))
+        # Cap lookback: do not go further than INCREMENTAL_LOOKBACK_DAYS.
+        oldest = max(oldest, today - timedelta(days=INCREMENTAL_LOOKBACK_DAYS))
     else:
         oldest = today - timedelta(days=INCREMENTAL_LOOKBACK_DAYS)
     return oldest, today
@@ -153,28 +158,46 @@ def backfill_vo2max_from_activities(profile, oldest: date, newest: date) -> int:
     return written
 
 
+def _mark_garmin_metric_unsupported(key: str, exc: GarminApiError) -> None:
+    if exc.status_code == 404:
+        _UNSUPPORTED_GARMIN_METRICS.add(key)
+        logger.info('Garmin metric endpoint %s marked unsupported (HTTP 404)', key)
+
+
 def _sync_garmin_weight(profile, client: GarminClient, start: date, end: date) -> int:
+    key = 'weight'
+    if key in _UNSUPPORTED_GARMIN_METRICS:
+        return 0
     try:
         raw = client.get_weight_range(start.isoformat(), end.isoformat())
     except GarminApiError as exc:
+        _mark_garmin_metric_unsupported(key, exc)
         logger.warning('Garmin weight sync failed %s..%s: %s', start, end, exc)
         return 0
     return ingest_garmin_weight(profile, raw)
 
 
 def _sync_garmin_ftp_stats(profile, client: GarminClient, start: date, end: date) -> int:
+    key = 'biometric_stats'
+    if key in _UNSUPPORTED_GARMIN_METRICS:
+        return 0
     try:
         raw = client.get_biometric_stats(start.isoformat(), end.isoformat())
     except GarminApiError as exc:
+        _mark_garmin_metric_unsupported(key, exc)
         logger.warning('Garmin biometric stats sync failed %s..%s: %s', start, end, exc)
         return 0
     return ingest_garmin_biometric_ftp(profile, raw)
 
 
 def _sync_garmin_vo2max(profile, client: GarminClient, start: date, end: date) -> int:
+    key = 'maxmet'
+    if key in _UNSUPPORTED_GARMIN_METRICS:
+        return 0
     try:
         raw = client.get_maxmet_daily(start.isoformat(), end.isoformat())
     except GarminApiError as exc:
+        _mark_garmin_metric_unsupported(key, exc)
         logger.warning('Garmin VO2max sync failed %s..%s: %s', start, end, exc)
         return 0
     return ingest_garmin_vo2max(profile, raw)

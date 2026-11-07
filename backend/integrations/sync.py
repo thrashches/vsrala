@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Optional
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils import timezone as dj_timezone
+from django.utils.dateparse import parse_datetime
 
 from activities.activity_types import INTERVALS_TYPE_MAP, resolve_intervals_type
 from activities.models import Activity
 from activities.parsers import TrackParseError, parse_track
+from activities.tasks import enqueue_activity_enrichment
 
 from .dedup import (
     SOURCE_INTERVALS,
-    find_activity_by_external_id,
     find_duplicate_activity,
+    known_external_ids,
+    link_external_id_only,
     merge_activity,
 )
 from .intervals_client import IntervalsApiError, IntervalsClient
@@ -28,6 +32,9 @@ EXTERNAL_SOURCE = SOURCE_INTERVALS
 
 # Backwards-compatible alias for tests/imports.
 TYPE_NAME_MAP = INTERVALS_TYPE_MAP
+
+# Cap FIT downloads per sync run to keep Celery RSS stable on small VPS.
+IMPORT_LIMIT_PER_RUN = 8
 
 
 def verify_api_key(api_key: str) -> dict:
@@ -88,6 +95,8 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
     newest = today + timedelta(days=1)
     client = IntervalsClient(connection.api_key, athlete_id=connection.athlete_id or '0')
     created = 0
+    imported_or_linked = 0
+    has_more = False
 
     try:
         remote_activities = client.list_activities(
@@ -99,12 +108,25 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
         connection.save(update_fields=['last_error', 'updated_at'])
         raise
 
+    known_ids = known_external_ids(connection.profile, EXTERNAL_SOURCE)
+
     for remote in remote_activities:
         activity_id = str(remote.get('id') or '')
         if not activity_id:
             continue
-        if find_activity_by_external_id(connection.profile, EXTERNAL_SOURCE, activity_id):
+        if activity_id in known_ids:
             continue
+
+        linked = try_link_without_download(connection, remote)
+        if linked is not None:
+            known_ids.add(activity_id)
+            imported_or_linked += 1
+            continue
+
+        if imported_or_linked >= IMPORT_LIMIT_PER_RUN:
+            has_more = True
+            break
+
         try:
             activity = import_remote_activity(connection, client, remote)
         except Exception:
@@ -114,23 +136,20 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
                 connection.profile_id,
             )
             continue
-        if activity is not None and getattr(activity, '_was_created', False):
+        if activity is None:
+            continue
+
+        known_ids.add(activity_id)
+        imported_or_linked += 1
+        if getattr(activity, '_was_created', False):
             created += 1
 
-    try:
-        from .metric_history import sync_intervals_metric_history
-
-        sync_intervals_metric_history(
-            connection,
-            client,
-            initial=initial,
-            remote_activities=remote_activities,
-        )
-    except Exception:
-        logger.exception(
-            'Intervals metric history sync failed for connection %s',
-            connection.pk,
-        )
+    if has_more:
+        # Keep the date window; continue on next task without advancing last_synced_at.
+        connection.last_error = ''
+        connection.save(update_fields=['last_error', 'updated_at'])
+        _enqueue_continue(connection.pk, initial=initial)
+        return created
 
     connection.last_synced_at = dj_timezone.now()
     connection.last_error = ''
@@ -140,6 +159,49 @@ def sync_connection(connection: IntervalsConnection, *, initial: bool = False) -
         update_fields.append('initial_sync_done')
     connection.save(update_fields=update_fields)
     return created
+
+
+def _enqueue_continue(connection_id: int, *, initial: bool) -> None:
+    try:
+        from .tasks import sync_connection as sync_connection_task
+
+        sync_connection_task.delay(connection_id, initial=initial)
+    except Exception:
+        logger.exception('Intervals sync: failed to enqueue continuation for %s', connection_id)
+
+
+def try_link_without_download(
+    connection: IntervalsConnection,
+    remote: dict,
+) -> Optional[Activity]:
+    """
+    If a local activity already has a track and matches Intervals summary fields,
+    only attach the Intervals external id — skip FIT download/parse.
+    """
+    activity_id = str(remote.get('id') or '')
+    if not activity_id:
+        return None
+
+    started_at = _intervals_started_at(remote)
+    if started_at is None:
+        return None
+
+    distance = _intervals_distance_km(remote)
+    duration = _intervals_duration(remote)
+    existing = find_duplicate_activity(
+        connection.profile,
+        started_at=started_at,
+        distance=distance,
+        duration=duration,
+    )
+    if existing is None:
+        return None
+    if not existing.track_points and not existing.track_file:
+        return None
+
+    link_external_id_only(existing, source=EXTERNAL_SOURCE, external_id=activity_id)
+    existing._was_created = False  # type: ignore[attr-defined]
+    return existing
 
 
 def import_remote_activity(
@@ -221,6 +283,8 @@ def import_remote_activity(
             prefer_incoming=prefer_incoming,
         )
         existing._was_created = False  # type: ignore[attr-defined]
+        if prefer_incoming or field_values.get('track_points') or field_values.get('streams'):
+            enqueue_activity_enrichment(existing.pk)
         return existing
 
     activity = Activity(
@@ -242,16 +306,65 @@ def import_remote_activity(
         logger.info('Intervals sync: duplicate %s skipped', activity_id)
         return None
 
-    from activities.map_preview import apply_map_preview
-    from activities.zone_timeline import apply_zone_timeline
-    apply_map_preview(activity)
-    apply_zone_timeline(activity)
+    enqueue_activity_enrichment(activity.pk)
     activity._was_created = True  # type: ignore[attr-defined]
     return activity
 
 
 def resolve_activity_type(intervals_type: Optional[str]):
     return resolve_intervals_type(intervals_type)
+
+
+def _intervals_started_at(remote: dict) -> Optional[datetime]:
+    for key in ('start_date_local', 'start_date', 'started'):
+        raw = remote.get(key)
+        if not raw:
+            continue
+        if isinstance(raw, datetime):
+            dt = raw
+        else:
+            text = str(raw).replace('Z', '+00:00')
+            dt = parse_datetime(text)
+            if dt is None and len(text) >= 10:
+                try:
+                    day = date.fromisoformat(text[:10])
+                    dt = datetime(day.year, day.month, day.day)
+                except ValueError:
+                    continue
+        if dt is None:
+            continue
+        if dj_timezone.is_naive(dt):
+            dt = dj_timezone.make_aware(dt, dj_timezone.get_current_timezone())
+        return dt
+    return None
+
+
+def _intervals_distance_km(remote: dict) -> Decimal:
+    raw = remote.get('distance')
+    if raw is None:
+        raw = remote.get('icu_distance')
+    try:
+        value = Decimal(str(raw or 0))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal('0')
+    # Intervals usually reports metres for distance.
+    if value > Decimal('1000'):
+        return (value / Decimal('1000')).quantize(Decimal('0.01'))
+    return value.quantize(Decimal('0.01')) if value else Decimal('0')
+
+
+def _intervals_duration(remote: dict) -> timedelta:
+    for key in ('moving_time', 'elapsed_time', 'icu_recording_time', 'duration'):
+        raw = remote.get(key)
+        if raw is None:
+            continue
+        try:
+            seconds = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if seconds > 0:
+            return timedelta(seconds=seconds)
+    return timedelta(0)
 
 
 def _download_track_bytes(
@@ -266,6 +379,14 @@ def _download_track_bytes(
             payload = client.download_original_file(activity_id)
             return payload, f'{activity_id}.{file_type}'
         except IntervalsApiError as exc:
+            # Non-network 404: don't bother with fit-file for non-fit originals later.
+            if exc.status_code == 404 and file_type == 'fit':
+                try:
+                    payload = client.download_fit_file(activity_id)
+                    return payload, f'{activity_id}.fit'
+                except IntervalsApiError as fit_exc:
+                    logger.warning('Intervals sync: download failed for %s: %s', activity_id, fit_exc)
+                    return None, ''
             logger.warning(
                 'Intervals sync: original file failed for %s (%s), trying fit-file',
                 activity_id,
