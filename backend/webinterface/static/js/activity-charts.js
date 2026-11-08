@@ -1,5 +1,5 @@
 /**
- * Render activity stream charts (speed / hr / power / elevation) with Chart.js.
+ * Render activity stream charts (speed / hr / power / cadence / elevation) with Chart.js.
  * X-axis is elapsed time; hover syncs a vertical crosshair across all charts.
  * Each chart marks its max point and draws an average horizontal line.
  * Elevation is drawn as a gray filled background on metric charts.
@@ -451,6 +451,7 @@
         (streams.speed || []).length,
         (streams.hr || []).length,
         (streams.power || []).length,
+        (streams.cadence || []).length,
         (streams.ele || []).length
       );
       var span = durationSec > 0 ? durationSec : Math.max(n - 1, 1);
@@ -463,16 +464,18 @@
     var speed = usePace ? toPacePoints(streams.speed, times) : toPoints(streams.speed, times);
     var hr = toPoints(streams.hr, times);
     var power = toPoints(streams.power, times);
+    var cadence = toPoints(streams.cadence, times);
     var ele = toPoints(streams.ele, times);
-    var range = xExtent([speed, hr, power, ele]);
+    var range = xExtent([speed, hr, power, cadence, ele]);
     if (durationSec > range.max) range.max = durationSec;
     var paceAvg = usePace ? avgPaceFromSpeeds(streams.speed) : null;
 
     var speedLabel = usePace ? 'Темп, мин/км' : 'Скорость, км/ч';
     var specs = [
-      ['chart-speed', speedLabel, speed, '#FC5200', true, usePace],
+      ['chart-speed', speedLabel, speed, '#2563EB', true, usePace],
       ['chart-hr', 'Пульс', hr, '#E8192E', true, false],
-      ['chart-power', 'Мощность, Вт', power, '#007FB6', true, false],
+      ['chart-power', 'Мощность, Вт', power, '#7C3AED', true, false],
+      ['chart-cadence', 'Каденс, об/мин', cadence, '#D946EF', true, false],
       ['chart-ele', 'Высота, м', ele, '#6d6d78', false, false],
     ];
 

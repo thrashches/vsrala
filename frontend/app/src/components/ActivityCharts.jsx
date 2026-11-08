@@ -364,9 +364,10 @@ function makeChart(canvas, label, data, color, xRange, eleData, getSyncTime, cha
 }
 
 const SPECS = [
-  { key: 'speed', title: 'Скорость', paceTitle: 'Темп', color: '#FC5200', withEleBg: true },
+  { key: 'speed', title: 'Скорость', paceTitle: 'Темп', color: '#2563EB', withEleBg: true },
   { key: 'hr', title: 'Пульс', color: '#E8192E', withEleBg: true },
-  { key: 'power', title: 'Мощность', color: '#007FB6', withEleBg: true },
+  { key: 'power', title: 'Мощность', color: '#7C3AED', withEleBg: true },
+  { key: 'cadence', title: 'Каденс', color: '#D946EF', withEleBg: true },
   { key: 'ele', title: 'Высота', color: '#6d6d78', withEleBg: false },
 ]
 
@@ -387,6 +388,7 @@ export default function ActivityCharts({ streams, durationSec = 0, usePace = fal
         (streams.speed || []).length,
         (streams.hr || []).length,
         (streams.power || []).length,
+        (streams.cadence || []).length,
         (streams.ele || []).length,
       )
       const span = durationSec > 0 ? durationSec : Math.max(n - 1, 1)
@@ -399,9 +401,10 @@ export default function ActivityCharts({ streams, durationSec = 0, usePace = fal
     const speed = usePace ? toPacePoints(streams.speed, times) : toPoints(streams.speed, times)
     const hr = toPoints(streams.hr, times)
     const power = toPoints(streams.power, times)
+    const cadence = toPoints(streams.cadence, times)
     const ele = toPoints(streams.ele, times)
-    const byKey = { speed, hr, power, ele }
-    const range = xExtent([speed, hr, power, ele])
+    const byKey = { speed, hr, power, cadence, ele }
+    const range = xExtent([speed, hr, power, cadence, ele])
     if (durationSec > range.max) range.max = durationSec
     const paceAvg = usePace ? avgPaceFromSpeeds(streams.speed) : null
 
@@ -496,7 +499,11 @@ export default function ActivityCharts({ streams, durationSec = 0, usePace = fal
 
   const hasAny =
     streams &&
-    (streams.speed?.length || streams.hr?.length || streams.power?.length || streams.ele?.length)
+    (streams.speed?.length ||
+      streams.hr?.length ||
+      streams.power?.length ||
+      streams.cadence?.length ||
+      streams.ele?.length)
 
   if (!hasAny) return null
 

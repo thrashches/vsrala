@@ -118,7 +118,7 @@
             </div>
         {% endif %}
 
-        {% if activity.streams.speed or activity.streams.hr or activity.streams.power or activity.streams.ele %}
+        {% if activity.streams.speed or activity.streams.hr or activity.streams.power or activity.streams.cadence or activity.streams.ele %}
         <div id="activity-streams"
              data-streams="{{ activity.streams_json|escape }}"
              data-duration="{{ activity.duration.total_seconds|floatformat:0 }}"
@@ -142,6 +142,12 @@
                 <h3 class="mb-2 text-sm font-semibold text-ink">Мощность</h3>
                 <div class="h-36">
                     <canvas id="chart-power"></canvas>
+                </div>
+            </div>
+            <div data-chart-panel>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Каденс</h3>
+                <div class="h-36">
+                    <canvas id="chart-cadence"></canvas>
                 </div>
             </div>
             <div data-chart-panel>

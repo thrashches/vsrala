@@ -300,7 +300,11 @@ export default function ActivityDetailPage() {
   const durationSec = parseDurationSec(activity.duration)
   const streams = activity.streams || {}
   const hasStreams =
-    streams.speed?.length || streams.hr?.length || streams.power?.length || streams.ele?.length
+    streams.speed?.length ||
+    streams.hr?.length ||
+    streams.power?.length ||
+    streams.cadence?.length ||
+    streams.ele?.length
   const paceMode = usesPace(activity)
   const avgPace = paceMode ? formatPace(activity.avg_speed) : null
   const movingPace = paceMode ? formatPace(activity.avg_moving_speed) : null
