@@ -138,3 +138,32 @@ class WeeklyLeadersServiceTest(TestCase):
         self.assertEqual(result['leaders'][0]['total'], 80.0)
         self.assertEqual(result['week'], 'previous')
         self.assertIn('сен', result['week_label'])
+
+    def test_my_training_days_marks_viewer_days(self):
+        result = weekly_leaders(self.me, today=self.today)
+        days = result['my_training_days']
+        self.assertEqual(len(days), 7)
+        self.assertEqual([d['weekday'] for d in days], ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'])
+        self.assertEqual(days[0]['date'], '2026-10-05')
+        # me rode on Tuesday 2026-10-06
+        self.assertTrue(days[1]['has_activity'])
+        self.assertEqual(days[1]['day'], 6)
+        self.assertEqual(days[1]['titles'], ['Моя'])
+        self.assertFalse(days[0]['has_activity'])
+        self.assertEqual(days[0]['titles'], [])
+        # friend's activities must not fill viewer's circles
+        self.assertEqual(sum(1 for d in days if d['has_activity']), 1)
+
+    def test_my_training_days_sport_filter(self):
+        # me has only ride this week → run filter clears the day
+        result = weekly_leaders(self.me, sport_id=self.run.pk, today=self.today)
+        self.assertFalse(any(d['has_activity'] for d in result['my_training_days']))
+
+        result_ride = weekly_leaders(self.me, sport_id=self.ride.pk, today=self.today)
+        self.assertTrue(result_ride['my_training_days'][1]['has_activity'])
+
+    def test_my_training_days_previous_week(self):
+        # me has no previous-week activity; friend does
+        result = weekly_leaders(self.me, week='previous', today=self.today)
+        self.assertEqual(result['my_training_days'][0]['date'], '2026-09-28')
+        self.assertFalse(any(d['has_activity'] for d in result['my_training_days']))

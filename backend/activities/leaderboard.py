@@ -17,6 +17,7 @@ _MONTHS_RU = (
     '', 'янв', 'фев', 'мар', 'апр', 'май', 'июн',
     'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
 )
+_WEEKDAYS_RU = ('ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС')
 
 
 def _tz():
@@ -69,6 +70,45 @@ def _format_distance(km) -> str:
     value = Decimal(km or 0).quantize(Decimal('0.01'))
     text = f'{value:f}'.rstrip('0').rstrip('.')
     return f'{text} км'
+
+
+def viewer_training_days(
+    viewer: Profile,
+    *,
+    week: str = 'current',
+    sport_id: Optional[int] = None,
+    today=None,
+) -> List[dict]:
+    """Return 7 day entries (Mon–Sun) with has_activity for the viewer."""
+    start, end = week_bounds(week, today=today)
+    tz = _tz()
+    monday = start.astimezone(tz).date()
+
+    qs = Activity.objects.filter(
+        profile=viewer,
+        started_at__gte=start,
+        started_at__lt=end,
+    ).order_by('started_at')
+    if sport_id is not None:
+        qs = qs.filter(activity_type_id=sport_id)
+
+    titles_by_date: dict = {}
+    for started_at, title in qs.values_list('started_at', 'title'):
+        day = started_at.astimezone(tz).date()
+        titles_by_date.setdefault(day, []).append(title or 'Без названия')
+
+    days: List[dict] = []
+    for offset in range(7):
+        day = monday + timedelta(days=offset)
+        titles = titles_by_date.get(day, [])
+        days.append({
+            'date': day.isoformat(),
+            'day': day.day,
+            'weekday': _WEEKDAYS_RU[offset],
+            'has_activity': bool(titles),
+            'titles': titles,
+        })
+    return days
 
 
 def weekly_leaders(
@@ -165,4 +205,7 @@ def weekly_leaders(
         'sport': sport_id,
         'available_sports': available_sports,
         'leaders': leaders,
+        'my_training_days': viewer_training_days(
+            viewer, week=week, sport_id=sport_id, today=today,
+        ),
     }
