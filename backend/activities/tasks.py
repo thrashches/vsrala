@@ -7,6 +7,7 @@ from celery import shared_task
 from activities.map_preview import apply_map_preview
 from activities.models import Activity
 from activities.services import update_activity_types_from_fit
+from activities.weather import attach_weather
 from activities.zone_timeline import apply_zone_timeline
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task
 def enrich_activity_after_import(activity_id: int) -> dict:
-    """Generate map preview and zone timeline after sync import (off hot path)."""
+    """Generate map preview, zone timeline, and weather after import (off hot path)."""
     try:
         activity = Activity.objects.get(pk=activity_id)
     except Activity.DoesNotExist:
@@ -23,6 +24,7 @@ def enrich_activity_after_import(activity_id: int) -> dict:
 
     preview_ok = False
     zones_ok = False
+    weather_ok = False
     try:
         preview_ok = bool(apply_map_preview(activity))
     except Exception:
@@ -31,7 +33,18 @@ def enrich_activity_after_import(activity_id: int) -> dict:
         zones_ok = bool(apply_zone_timeline(activity))
     except Exception:
         logger.exception('Zone timeline failed for activity %s', activity_id)
-    return {'ok': True, 'map_preview': preview_ok, 'zone_timeline': zones_ok}
+    try:
+        # Reload in case map/zone saved other fields; weather needs track_points.
+        activity.refresh_from_db()
+        weather_ok = bool(attach_weather(activity))
+    except Exception:
+        logger.exception('Weather attach failed for activity %s', activity_id)
+    return {
+        'ok': True,
+        'map_preview': preview_ok,
+        'zone_timeline': zones_ok,
+        'weather': weather_ok,
+    }
 
 
 def enqueue_activity_enrichment(activity_id: int) -> None:
@@ -40,6 +53,30 @@ def enqueue_activity_enrichment(activity_id: int) -> None:
         enrich_activity_after_import.delay(activity_id)
     except Exception:
         logger.exception('Failed to enqueue enrichment for activity %s', activity_id)
+
+
+@shared_task(ignore_result=True)
+def attach_activity_weather_task(activity_id: int) -> dict:
+    """Attach Open-Meteo weather for a single activity (off hot path)."""
+    try:
+        activity = Activity.objects.get(pk=activity_id)
+    except Activity.DoesNotExist:
+        logger.warning('Activity %s not found for weather attach', activity_id)
+        return {'ok': False, 'error': 'not_found'}
+    try:
+        ok = bool(attach_weather(activity))
+    except Exception:
+        logger.exception('Weather attach failed for activity %s', activity_id)
+        return {'ok': False, 'error': 'exception'}
+    return {'ok': True, 'weather': ok}
+
+
+def enqueue_activity_weather(activity_id: int) -> None:
+    """Fire-and-forget weather attach; ignore broker errors."""
+    try:
+        attach_activity_weather_task.apply_async(args=(activity_id,), ignore_result=True)
+    except Exception:
+        logger.exception('Failed to enqueue weather for activity %s', activity_id)
 
 
 @shared_task

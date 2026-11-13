@@ -4,6 +4,7 @@ import ActivitySource from './ActivitySource'
 import ActivityTypeLabel from './ActivityTypeLabel'
 import Avatar from './Avatar'
 import Reactions from './Reactions'
+import WeatherSummary from './WeatherSummary'
 
 export default function ActivityCard({ activity, onReactionChange }) {
   const preview =
@@ -102,6 +103,8 @@ export default function ActivityCard({ activity, onReactionChange }) {
           </div>
         ) : null}
       </div>
+
+      <WeatherSummary weather={activity.weather_summary} />
 
       {preview && (
         <div className="relative z-0 mt-4 overflow-hidden">

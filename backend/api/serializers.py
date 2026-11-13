@@ -144,7 +144,7 @@ class ActivityListSerializer(serializers.ModelSerializer):
             'avg_hr', 'max_hr', 'avg_power', 'max_power', 'normalized_power',
             'tss', 'avg_cadence', 'max_cadence',
             'elevation_gain', 'elevation_loss', 'elevation_min', 'elevation_max',
-            'is_indoor', 'map_preview_url', 'started_at', 'created_at',
+            'is_indoor', 'map_preview_url', 'weather_summary', 'started_at', 'created_at',
             'external_source', 'calories', 'device_name',
             'reaction_counts', 'my_reaction', 'comment_count', 'medias',
         )
@@ -208,7 +208,8 @@ class ActivityDetailSerializer(ActivityListSerializer):
 
     class Meta(ActivityListSerializer.Meta):
         fields = ActivityListSerializer.Meta.fields + (
-            'track_points', 'streams', 'zone_timeline_url', 'zone_stream',
+            'track_points', 'streams', 'weather_timeline',
+            'zone_timeline_url', 'zone_stream',
             'comments', 'hr_zone_rows', 'power_zone_rows', 'best_efforts',
             'is_owner', 'has_hr_stream', 'has_power_stream',
             'hr_zones_configured', 'power_zones_configured',

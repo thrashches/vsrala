@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import Activity, ActivityComment, ActivityReaction, ActivityType
+from .models import Activity, ActivityComment, ActivityReaction, ActivityType, WeatherForecast
 from .tasks import generate_map_previews_for_activities, update_activity_types_from_fit_task
 from user_medias.models import ActivityMedia
 
@@ -69,6 +69,13 @@ class ActivityAdmin(admin.ModelAdmin):
             f'Запущено фоновое обновление типов из FIT для {len(activity_ids)} активност(ей).',
             messages.SUCCESS,
         )
+
+
+@admin.register(WeatherForecast)
+class WeatherForecastAdmin(admin.ModelAdmin):
+    list_display = ('id', 'lat', 'lon', 'period_start', 'period_end', 'status', 'fetched_at')
+    list_filter = ('status', 'source')
+    search_fields = ('error',)
 
 
 @admin.register(ActivityReaction)

@@ -1,0 +1,26 @@
+{% with w=weather %}
+<div class="mt-3 flex flex-wrap items-center gap-3 px-4 text-sm text-ink-muted" title="Погода во время тренировки">
+    <span class="inline-flex items-center gap-1">
+        <span class="material-icons text-base leading-none text-ink" aria-hidden="true">
+            {% if w.condition == 'clear' %}wb_sunny{% elif w.condition == 'rain' %}umbrella{% elif w.condition == 'snow' %}ac_unit{% else %}cloud{% endif %}
+        </span>
+        {% if w.temperature_c != None %}
+            <span class="font-semibold tabular-nums text-ink">
+                {{ w.temperature_c|floatformat:0 }}<span class="text-xs font-normal text-ink-muted"> °C</span>
+            </span>
+        {% endif %}
+    </span>
+    {% if w.wind_speed_kmh != None %}
+        <span class="inline-flex items-center gap-0.5">
+            <span class="material-icons text-base leading-none text-ink"
+                  aria-hidden="true"
+                  style="transform: rotate({% if w.wind_direction_deg != None %}{{ w.wind_direction_deg|add:180 }}{% else %}0{% endif %}deg);">
+                navigation
+            </span>
+            <span class="font-semibold tabular-nums text-ink">
+                {{ w.wind_speed_kmh|floatformat:0 }}<span class="text-xs font-normal text-ink-muted"> км/ч</span>
+            </span>
+        </span>
+    {% endif %}
+</div>
+{% endwith %}

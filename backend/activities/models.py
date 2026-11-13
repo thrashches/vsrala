@@ -120,6 +120,20 @@ class Activity(models.Model):
         blank=True, null=True, max_digits=5, decimal_places=1,
         verbose_name='VO2max',
     )
+    weather_timeline = models.JSONField(
+        blank=True, null=True, default=list,
+        verbose_name='хронология погоды',
+    )
+    weather_summary = models.JSONField(
+        blank=True, null=True, default=None,
+        verbose_name='сводка погоды',
+    )
+    weather_forecasts = models.ManyToManyField(
+        'WeatherForecast',
+        blank=True,
+        related_name='activities',
+        verbose_name='прогнозы погоды',
+    )
 
     def __str__(self):
         return f'{self.profile.email}: {self.title} {self.created_at}'
@@ -223,6 +237,38 @@ class Activity(models.Model):
                 self.title = 'Ночная тренировка'
         super().save(force_insert=force_insert, force_update=force_update, using=using,
                      update_fields=update_fields)
+
+
+class WeatherForecast(models.Model):
+    class Meta:
+        verbose_name = 'прогноз погоды'
+        verbose_name_plural = 'прогнозы погоды'
+        indexes = [
+            models.Index(fields=['lat', 'lon', 'period_start', 'period_end']),
+        ]
+        ordering = ['-period_start']
+
+    STATUS_OK = 'ok'
+    STATUS_ERROR = 'error'
+    STATUS_CHOICES = [
+        (STATUS_OK, 'OK'),
+        (STATUS_ERROR, 'Ошибка'),
+    ]
+
+    lat = models.DecimalField(max_digits=9, decimal_places=6, verbose_name='широта')
+    lon = models.DecimalField(max_digits=9, decimal_places=6, verbose_name='долгота')
+    period_start = models.DateTimeField(verbose_name='начало периода')
+    period_end = models.DateTimeField(verbose_name='конец периода')
+    hourly = models.JSONField(blank=True, default=list, verbose_name='почасовые данные')
+    source = models.CharField(max_length=32, default='open-meteo', verbose_name='источник')
+    fetched_at = models.DateTimeField(auto_now_add=True, verbose_name='время загрузки')
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_OK, verbose_name='статус',
+    )
+    error = models.TextField(blank=True, default='', verbose_name='ошибка')
+
+    def __str__(self):
+        return f'{self.lat},{self.lon} {self.period_start:%Y-%m-%d %H:%M}–{self.period_end:%H:%M}'
 
 
 class ActivityReaction(models.Model):

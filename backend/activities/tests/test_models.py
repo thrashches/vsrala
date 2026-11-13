@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
@@ -84,7 +85,8 @@ class ActivityUploadViewTest(TestCase):
         self.user = Profile.objects.create_user(email='rider@example.com', password='testpass123')
         self.client.login(email='rider@example.com', password='testpass123')
 
-    def test_upload_gpx(self):
+    @patch('activities.tasks.enqueue_activity_weather')
+    def test_upload_gpx(self, _enqueue_weather):
         content = (FIXTURES / 'sample.gpx').read_bytes()
         upload = SimpleUploadedFile('sample.gpx', content, content_type='application/gpx+xml')
         response = self.client.post(reverse('webinterface:activity_upload'), {
@@ -98,6 +100,7 @@ class ActivityUploadViewTest(TestCase):
         self.assertGreater(float(activity.distance), 0)
         self.assertTrue(activity.track_points)
         self.assertEqual(activity.profile, self.user)
+        _enqueue_weather.assert_called_once_with(activity.pk)
 
     def test_upload_rejects_bad_extension(self):
         upload = SimpleUploadedFile('notes.txt', b'hello', content_type='text/plain')

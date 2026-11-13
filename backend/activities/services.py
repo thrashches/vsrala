@@ -22,6 +22,8 @@ def create_activity_from_upload(
     activity_type=None,
 ) -> Activity:
     """Parse uploaded GPX/FIT, create Activity, apply map/zone side effects."""
+    from activities.tasks import enqueue_activity_weather
+
     filename = track_file.name
     track_file.seek(0)
     file_bytes = track_file.read()
@@ -47,6 +49,8 @@ def create_activity_from_upload(
     activity.save()
     apply_map_preview(activity)
     apply_zone_timeline(activity)
+    # Weather (Open-Meteo) off hot path so upload stays responsive.
+    enqueue_activity_weather(activity.pk)
     return activity
 
 

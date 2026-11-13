@@ -73,6 +73,10 @@
                                 {% endif %}
                             </div>
 
+                            {% if activity.weather_summary %}
+                                {% include 'includes/activity_weather.html' with weather=activity.weather_summary %}
+                            {% endif %}
+
                             {% if activity.map_preview %}
                                 <div class="relative z-0 mt-4 overflow-hidden">
                                     <a href="{% url 'webinterface:activity_detail' activity.pk %}" class="block">

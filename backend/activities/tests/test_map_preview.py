@@ -140,8 +140,9 @@ class MapPreviewUploadAndFeedTest(TestCase):
         self.user = Profile.objects.create_user(email='feedmap@example.com', password='testpass123')
         self.client.login(email='feedmap@example.com', password='testpass123')
 
+    @patch('activities.tasks.enqueue_activity_weather')
     @patch('activities.map_preview._fetch_tile', side_effect=_fake_tile)
-    def test_upload_gpx_sets_map_preview(self, _mock):
+    def test_upload_gpx_sets_map_preview(self, _mock, _enqueue_weather):
         content = (FIXTURES / 'sample.gpx').read_bytes()
         upload = SimpleUploadedFile('sample.gpx', content, content_type='application/gpx+xml')
         response = self.client.post(reverse('webinterface:activity_upload'), {

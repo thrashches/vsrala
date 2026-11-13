@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
@@ -105,7 +106,8 @@ class ZoneTimelineTest(TestCase):
         self.assertGreater(width, 0)
         self.assertGreater(height, 0)
 
-    def test_upload_indoor_fit_sets_flag(self):
+    @patch('activities.tasks.enqueue_activity_weather')
+    def test_upload_indoor_fit_sets_flag(self, _enqueue_weather):
         # sample.fit from fixtures may be outdoor; synthesize via apply
         client = Client()
         user = Profile.objects.create_user(email='up@example.com', password='testpass123')
